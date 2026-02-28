@@ -55,38 +55,18 @@ export function ForecastPanel({
   }
 
   return (
-    <div
-      style={{
-        background: "#fff",
-        borderRadius: 12,
-        padding: 24,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-        border: "1px solid #e8e8e8",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 16,
-        }}
-      >
-        <h3 style={{ margin: 0, fontSize: 18, color: "#333" }}>
+    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-gray-800">
           AI Forecast
         </h3>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="flex gap-2">
           <select
             value={metric}
             onChange={(e) =>
               setMetric(e.target.value as "cloud_cover" | "lightning")
             }
-            style={{
-              padding: "8px 12px",
-              borderRadius: 6,
-              border: "1px solid #ddd",
-              fontSize: 14,
-            }}
+            className="px-3 py-2 rounded-md border border-gray-300 text-sm"
           >
             <option value="cloud_cover">Cloud Cover</option>
             <option value="lightning">Lightning</option>
@@ -94,16 +74,11 @@ export function ForecastPanel({
           <button
             onClick={() => onFetchForecast(metric)}
             disabled={loading}
-            style={{
-              padding: "8px 20px",
-              borderRadius: 6,
-              border: "none",
-              background: loading ? "#ccc" : "#7c3aed",
-              color: "#fff",
-              cursor: loading ? "default" : "pointer",
-              fontSize: 14,
-              fontWeight: 500,
-            }}
+            className={`px-5 py-2 rounded-md border-none text-white text-sm font-medium transition-colors ${
+              loading
+                ? "bg-gray-300 cursor-default"
+                : "bg-violet-600 cursor-pointer hover:bg-violet-700"
+            }`}
           >
             {loading ? "Forecasting..." : "Generate Forecast"}
           </button>
@@ -112,14 +87,7 @@ export function ForecastPanel({
 
       {forecastData && chartData.length > 0 && (
         <>
-          <div
-            style={{
-              fontSize: 13,
-              color: "#888",
-              marginBottom: 8,
-              textAlign: "center",
-            }}
-          >
+          <div className="text-xs text-gray-400 mb-2 text-center">
             Forecast for {forecastData.station_name} — {forecastData.metric}
           </div>
           <ResponsiveContainer width="100%" height={300}>
@@ -174,7 +142,7 @@ export function ForecastPanel({
       )}
 
       {!forecastData && !loading && (
-        <div style={{ textAlign: "center", padding: 30, color: "#aaa" }}>
+        <div className="text-center py-8 text-gray-300">
           Select a metric and click "Generate Forecast" to see AI predictions.
         </div>
       )}

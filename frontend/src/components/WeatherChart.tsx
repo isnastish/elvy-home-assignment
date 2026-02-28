@@ -44,14 +44,7 @@ export function WeatherChart({ data }: WeatherChartProps) {
 
   if (chartData.length === 0) {
     return (
-      <div
-        style={{
-          textAlign: "center",
-          padding: 40,
-          color: "#888",
-          fontSize: 16,
-        }}
-      >
+      <div className="text-center py-10 text-gray-400 text-base">
         No data available for this location and granularity.
       </div>
     );
@@ -59,14 +52,7 @@ export function WeatherChart({ data }: WeatherChartProps) {
 
   return (
     <div>
-      <div
-        style={{
-          marginBottom: 12,
-          fontSize: 14,
-          color: "#666",
-          textAlign: "center",
-        }}
-      >
+      <div className="mb-3 text-sm text-gray-500 text-center">
         Station: <strong>{data.station_name}</strong> (ID: {data.station_id}) —{" "}
         {data.latitude.toFixed(4)}°N, {data.longitude.toFixed(4)}°E
       </div>
