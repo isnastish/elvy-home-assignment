@@ -75,7 +75,17 @@ function App() {
               />
             </section>
 
-            <section className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
+            <section className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6 relative">
+              {/* Loading overlay when switching granularity with existing data */}
+              {loading && weatherData && (
+                <div className="absolute inset-0 bg-white/70 rounded-xl flex items-center justify-center z-10">
+                  <div className="flex flex-col items-center gap-3 text-gray-400">
+                    <div className="w-8 h-8 border-3 border-gray-200 border-t-blue-600 rounded-full animate-spin" />
+                    <span className="text-sm">Updating...</span>
+                  </div>
+                </div>
+              )}
+
               {loading && !weatherData && (
                 <div className="flex flex-col items-center gap-4 py-10 text-gray-400 text-base">
                   <div className="w-8 h-8 border-3 border-gray-200 border-t-blue-600 rounded-full animate-spin" />

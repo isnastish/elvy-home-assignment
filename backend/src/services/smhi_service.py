@@ -1,5 +1,20 @@
-"""Business logic for aggregating SMHI weather data."""
+"""Business logic for aggregating SMHI weather data.
 
+Key meteorological concepts
+----------------------------
+**Cloud cover – percent (0–100 %)**:
+    SMHI parameter 16 reports total cloud cover as a percentage.
+    0 % = completely clear sky, 100 % = completely overcast.
+
+**Thunder days – SMHI parameter 30**:
+    Reported as the *number of days with thunder in a calendar month*.
+    We convert this to a daily probability:
+        probability = thunder_days / days_in_month × 100
+    Because the raw data is inherently monthly, the ``DAY`` granularity
+    is not meaningful and we fall back to ``MONTH``.
+"""
+
+import calendar
 import logging
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -71,16 +86,35 @@ class SmhiService:
         return result
 
     @staticmethod
+    def _days_in_month(year: int, month: int) -> int:
+        """Return the number of days in a given month (accounts for leap years)."""
+        return calendar.monthrange(year, month)[1]
+
+    @staticmethod
     def _aggregate_thunder_as_probability(
         raw_values: list[dict],
         granularity: Granularity,
     ) -> list[WeatherDataPoint]:
-        """Aggregate thunder day data as probability percentage.
+        """Aggregate thunder-day counts into a daily probability percentage.
 
-        Thunder days parameter gives count of days with thunder per month.
-        We convert to probability: (thunder_days / days_in_period) * 100.
+        SMHI parameter 30 gives the *number of days with thunder per month*.
+        We convert to a probability that any single day in the period has
+        thunder: ``(thunder_days / days_in_period) × 100``.
+
+        Because the underlying data is monthly, ``DAY`` granularity is not
+        meaningful — we automatically promote it to ``MONTH`` and log a
+        warning.
         """
-        buckets: dict[str, list[float]] = defaultdict(list)
+        effective_granularity = granularity
+        if granularity == Granularity.DAY:
+            logger.warning(
+                "Thunder-days data is monthly; daily granularity is not "
+                "supported. Falling back to MONTH."
+            )
+            effective_granularity = Granularity.MONTH
+
+        # Bucket: key → list of (thunder_days, year, month) tuples
+        buckets: dict[str, list[tuple[float, int, int]]] = defaultdict(list)
 
         for entry in raw_values:
             ts = entry.get("date")
@@ -93,26 +127,26 @@ class SmhiService:
                 continue
 
             dt = SmhiService._timestamp_to_datetime(ts)
-            key = SmhiService._period_key(dt, granularity)
-            buckets[key].append(value)
+            key = SmhiService._period_key(dt, effective_granularity)
+            buckets[key].append((value, dt.year, dt.month))
 
         result = []
         for period in sorted(buckets.keys()):
-            values = buckets[period]
-            if granularity == Granularity.MONTH:
-                # Thunder days per month → probability of thunder on any given day
-                avg_thunder_days = sum(values) / len(values)
-                # Estimate ~30 days per month
-                probability = round(min((avg_thunder_days / 30.0) * 100, 100), 2)
-            elif granularity == Granularity.YEAR:
-                # Sum thunder days across the year, divide by 365
-                total_thunder_days = sum(values)
-                probability = round(min((total_thunder_days / 365.0) * 100, 100), 2)
-            else:
-                # Day granularity: for thunder days data, we get monthly counts
-                # so we spread the probability across days
-                avg_val = sum(values) / len(values)
-                probability = round(min((avg_val / 30.0) * 100, 100), 2)
+            entries = buckets[period]
+
+            if effective_granularity == Granularity.MONTH:
+                # Average thunder-day counts if >1 entry for the same month
+                avg_thunder_days = sum(v for v, _, _ in entries) / len(entries)
+                # Use the actual number of days in that month
+                _, year, month = entries[0]
+                days = SmhiService._days_in_month(year, month)
+                probability = round(min((avg_thunder_days / days) * 100, 100), 2)
+
+            else:  # YEAR
+                total_thunder_days = sum(v for v, _, _ in entries)
+                year = entries[0][1]
+                days_in_year = 366 if calendar.isleap(year) else 365
+                probability = round(min((total_thunder_days / days_in_year) * 100, 100), 2)
 
             result.append(WeatherDataPoint(period=period, value=probability))
 

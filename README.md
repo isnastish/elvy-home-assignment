@@ -5,7 +5,7 @@ A full-stack web application for visualizing historical cloud cover and lightnin
 ## Features
 
 - **Address search** — enter any Swedish address or city, geocoded via OpenStreetMap/Nominatim
-- **Cloud cover visualization** — historical cloud cover data (oktas, 0–8 scale) from the nearest SMHI station
+- **Cloud cover visualization** — historical cloud cover data (percentage, 0–100%) from the nearest SMHI station
 - **Lightning probability** — thunder day observations converted to strike probability percentages
 - **Granularity toggle** — view data aggregated by day, month, or year
 - **AI forecasting** — Ridge regression model with seasonal decomposition predicts future values with 95% confidence intervals
@@ -136,6 +136,6 @@ Required GitHub secrets/variables:
 ## Data Sources
 
 - **Weather data**: [SMHI Open Data — Meteorological Observations API](https://opendata.smhi.se/apidocs/metobs/)
-  - Parameter 16: Total cloud cover (oktas)
+  - Parameter 16: Total cloud cover (percent, 0–100%)
   - Parameter 30: Number of days with thunder (monthly)
 - **Geocoding**: [Nominatim (OpenStreetMap)](https://nominatim.openstreetmap.org/)

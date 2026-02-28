@@ -36,7 +36,7 @@ async def get_cloud_cover(
     """Get historical cloud cover data for a location.
 
     Returns cloud cover data aggregated by the specified granularity (day, month, or year).
-    Cloud cover is measured in oktas (0-8 scale, where 0 = clear sky, 8 = overcast).
+    Cloud cover is measured as a percentage (0–100%, where 0% = clear sky, 100% = overcast).
     """
     logger.info(f"Getting cloud cover for ({lat}, {lon}) at {granularity} granularity")
     return await smhi_service.get_cloud_cover(lat, lon, granularity)
@@ -74,7 +74,7 @@ async def get_combined_weather(
 ) -> CombinedWeatherResponse:
     """Get both cloud cover and lightning data in a single request.
 
-    Returns cloud cover (oktas) and lightning probability (%) for the given location.
+    Returns cloud cover (%) and lightning probability (%) for the given location.
     """
     logger.info(f"Getting combined weather for ({lat}, {lon}) at {granularity} granularity")
     return await smhi_service.get_combined_weather(lat, lon, granularity)

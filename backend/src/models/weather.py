@@ -23,7 +23,7 @@ class CloudCoverResponse(BaseModel):
     station_id: int
     latitude: float
     longitude: float
-    parameter_description: str = "Total cloud cover (oktas, 0-8 scale)"
+    parameter_description: str = "Total cloud cover (percent, 0-100%)"
     granularity: Granularity
     data: list[WeatherDataPoint]
 
@@ -48,7 +48,7 @@ class CombinedWeatherResponse(BaseModel):
     latitude: float
     longitude: float
     granularity: Granularity
-    cloud_cover: list[WeatherDataPoint] = Field(description="Cloud cover data (oktas, 0-8 scale)")
+    cloud_cover: list[WeatherDataPoint] = Field(description="Cloud cover data (percent, 0-100%)")
     lightning: list[WeatherDataPoint] = Field(description="Lightning/thunder probability (0-100%)")
 
 

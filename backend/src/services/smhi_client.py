@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 SMHI_BASE_URL = "https://opendata-download-metobs.smhi.se/api"
 
 # SMHI Metobs parameter IDs
-PARAM_CLOUD_COVER = 16  # Total cloud cover (mean, 1/8)
+PARAM_CLOUD_COVER = 16  # Total cloud cover (mean, percent 0–100)
 PARAM_THUNDER_DAYS = 30  # Number of days with thunder (monthly)
 
 
