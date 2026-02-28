@@ -132,39 +132,6 @@ Required GitHub secrets/variables:
 - `WIF_PROVIDER` (secret) — Workload Identity Federation provider
 - `WIF_SERVICE_ACCOUNT` (secret) — GCP service account
 
-## Project Structure
-
-```
-smhi-weather-app/
-├── backend/
-│   ├── src/
-│   │   ├── main.py                  # FastAPI app setup
-│   │   ├── settings.py              # Configuration
-│   │   ├── dependencies.py          # Dependency injection
-│   │   ├── models/                  # Pydantic models
-│   │   ├── routes/                  # API route handlers
-│   │   ├── services/                # Business logic
-│   │   │   ├── smhi_client.py       # SMHI API client with caching
-│   │   │   ├── smhi_service.py      # Data aggregation service
-│   │   │   ├── geocoding_service.py # Address → coordinates
-│   │   │   └── forecast_service.py  # ML forecasting
-│   │   └── exceptions/              # Custom error handling
-│   ├── tests/                       # pytest test suite
-│   ├── Dockerfile
-│   └── pyproject.toml
-├── frontend/
-│   ├── src/
-│   │   ├── App.tsx                  # Main app component
-│   │   ├── components/              # React components
-│   │   ├── hooks/                   # Custom React hooks
-│   │   ├── api/                     # API client
-│   │   └── types/                   # TypeScript types
-│   ├── Dockerfile
-│   └── package.json
-├── terraform/                       # GCP Cloud Run IaC
-├── .github/workflows/               # CI/CD pipelines
-└── docker-compose.yaml
-```
 
 ## Data Sources
 
