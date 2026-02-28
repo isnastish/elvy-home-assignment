@@ -29,13 +29,12 @@ class CloudCoverResponse(BaseModel):
 
 
 class LightningResponse(BaseModel):
-    """Response containing lightning/thunder data."""
+    """Response containing lightning strike count data."""
 
-    station_name: str
-    station_id: int
     latitude: float
     longitude: float
-    parameter_description: str = "Thunder probability (based on historical thunder day observations)"
+    radius_km: float = Field(description="Search radius in km around the location")
+    parameter_description: str = "Lightning strike count (SMHI Lightning Archive)"
     granularity: Granularity
     data: list[WeatherDataPoint]
 
@@ -49,7 +48,7 @@ class CombinedWeatherResponse(BaseModel):
     longitude: float
     granularity: Granularity
     cloud_cover: list[WeatherDataPoint] = Field(description="Cloud cover data (percent, 0-100%)")
-    lightning: list[WeatherDataPoint] = Field(description="Lightning/thunder probability (0-100%)")
+    lightning: list[WeatherDataPoint] = Field(description="Lightning strike counts near the location")
 
 
 class ForecastDataPoint(BaseModel):

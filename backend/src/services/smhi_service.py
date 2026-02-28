@@ -6,18 +6,17 @@ Key meteorological concepts
     SMHI parameter 16 reports total cloud cover as a percentage.
     0 % = completely clear sky, 100 % = completely overcast.
 
-**Thunder days – SMHI parameter 30**:
-    Reported as the *number of days with thunder in a calendar month*.
-    We convert this to a daily probability:
-        probability = thunder_days / days_in_month × 100
-    Because the raw data is inherently monthly, the ``DAY`` granularity
-    is not meaningful and we fall back to ``MONTH``.
+**Lightning strikes – SMHI Lightning Archive API**:
+    SMHI provides a separate Lightning Archive API at
+    ``opendata-download-lightning.smhi.se`` with individual strike records
+    including lat/lon, timestamp, and peak current.
+    We count strikes within a configurable radius (default 50 km) of the
+    user's location and aggregate by day / month / year.
 """
 
-import calendar
 import logging
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from src.models.location import Station
 from src.models.weather import (
@@ -27,16 +26,26 @@ from src.models.weather import (
     LightningResponse,
     WeatherDataPoint,
 )
-from src.services.smhi_client import PARAM_CLOUD_COVER, PARAM_THUNDER_DAYS, SmhiClient
+from src.services.lightning_client import LightningClient
+from src.services.smhi_client import PARAM_CLOUD_COVER, SmhiClient
+from src.settings import settings
 
 logger = logging.getLogger(__name__)
+
+# Default date range for lightning queries
+_LIGHTNING_YEARS_BACK = 3
 
 
 class SmhiService:
     """Service for retrieving and processing SMHI weather data."""
 
-    def __init__(self, client: SmhiClient) -> None:
+    def __init__(self, client: SmhiClient, lightning_client: LightningClient) -> None:
         self._client = client
+        self._lightning_client = lightning_client
+
+    # ------------------------------------------------------------------ #
+    # Helpers
+    # ------------------------------------------------------------------ #
 
     @staticmethod
     def _timestamp_to_datetime(ts_ms: int) -> datetime:
@@ -44,8 +53,8 @@ class SmhiService:
         return datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc)
 
     @staticmethod
-    def _period_key(dt: datetime, granularity: Granularity) -> str:
-        """Create a period key string from a datetime."""
+    def _period_key(dt: datetime | date, granularity: Granularity) -> str:
+        """Create a period key string from a datetime or date."""
         match granularity:
             case Granularity.DAY:
                 return dt.strftime("%Y-%m-%d")
@@ -76,7 +85,6 @@ class SmhiService:
             key = SmhiService._period_key(dt, granularity)
             buckets[key].append(value)
 
-        # Calculate mean per period
         result = []
         for period in sorted(buckets.keys()):
             values = buckets[period]
@@ -86,86 +94,49 @@ class SmhiService:
         return result
 
     @staticmethod
-    def _days_in_month(year: int, month: int) -> int:
-        """Return the number of days in a given month (accounts for leap years)."""
-        return calendar.monthrange(year, month)[1]
-
-    @staticmethod
-    def _aggregate_thunder_as_probability(
-        raw_values: list[dict],
+    def _aggregate_lightning_strikes(
+        daily_counts: dict[date, int],
         granularity: Granularity,
     ) -> list[WeatherDataPoint]:
-        """Aggregate thunder-day counts into a daily probability percentage.
+        """Aggregate daily strike counts by the requested granularity.
 
-        SMHI parameter 30 gives the *number of days with thunder per month*.
-        We convert to a probability that any single day in the period has
-        thunder: ``(thunder_days / days_in_period) × 100``.
+        - **DAY**: one data point per day (the raw count).
+        - **MONTH**: sum of strikes in each calendar month.
+        - **YEAR**: sum of strikes in each year.
 
-        Because the underlying data is monthly, ``DAY`` granularity is not
-        meaningful — we automatically promote it to ``MONTH`` and log a
-        warning.
+        Days with zero strikes are **not** included in the output.
         """
-        effective_granularity = granularity
-        if granularity == Granularity.DAY:
-            logger.warning(
-                "Thunder-days data is monthly; daily granularity is not "
-                "supported. Falling back to MONTH."
-            )
-            effective_granularity = Granularity.MONTH
+        buckets: dict[str, int] = defaultdict(int)
 
-        # Bucket: key → list of (thunder_days, year, month) tuples
-        buckets: dict[str, list[tuple[float, int, int]]] = defaultdict(list)
+        for day, count in daily_counts.items():
+            key = SmhiService._period_key(day, granularity)
+            buckets[key] += count
 
-        for entry in raw_values:
-            ts = entry.get("date")
-            val = entry.get("value")
-            if ts is None or val is None:
-                continue
-            try:
-                value = float(val)
-            except (ValueError, TypeError):
-                continue
+        return [
+            WeatherDataPoint(period=period, value=float(total))
+            for period, total in sorted(buckets.items())
+        ]
 
-            dt = SmhiService._timestamp_to_datetime(ts)
-            key = SmhiService._period_key(dt, effective_granularity)
-            buckets[key].append((value, dt.year, dt.month))
-
-        result = []
-        for period in sorted(buckets.keys()):
-            entries = buckets[period]
-
-            if effective_granularity == Granularity.MONTH:
-                # Average thunder-day counts if >1 entry for the same month
-                avg_thunder_days = sum(v for v, _, _ in entries) / len(entries)
-                # Use the actual number of days in that month
-                _, year, month = entries[0]
-                days = SmhiService._days_in_month(year, month)
-                probability = round(min((avg_thunder_days / days) * 100, 100), 2)
-
-            else:  # YEAR
-                total_thunder_days = sum(v for v, _, _ in entries)
-                year = entries[0][1]
-                days_in_year = 366 if calendar.isleap(year) else 365
-                probability = round(min((total_thunder_days / days_in_year) * 100, 100), 2)
-
-            result.append(WeatherDataPoint(period=period, value=probability))
-
-        return result
+    # ------------------------------------------------------------------ #
+    # Station lookup
+    # ------------------------------------------------------------------ #
 
     async def _find_best_station(self, parameter: int, lat: float, lon: float) -> Station:
         """Find the nearest active station for a parameter."""
         stations = await self._client.find_nearest_stations(parameter, lat, lon, limit=10)
 
-        # Prefer active stations
         for station in stations:
             if station.active:
                 return station
 
-        # Fallback: return nearest regardless
         if stations:
             return stations[0]
 
         raise ValueError(f"No stations found for parameter {parameter} near ({lat}, {lon})")
+
+    # ------------------------------------------------------------------ #
+    # Public API
+    # ------------------------------------------------------------------ #
 
     async def get_cloud_cover(self, lat: float, lon: float, granularity: Granularity) -> CloudCoverResponse:
         """Get aggregated cloud cover data for a location."""
@@ -183,38 +154,63 @@ class SmhiService:
             data=data_points,
         )
 
-    async def get_lightning(self, lat: float, lon: float, granularity: Granularity) -> LightningResponse:
-        """Get aggregated lightning/thunder probability for a location."""
-        station = await self._find_best_station(PARAM_THUNDER_DAYS, lat, lon)
-        raw_data = await self._client.get_station_data(PARAM_THUNDER_DAYS, station.id)
+    async def get_lightning(
+        self,
+        lat: float,
+        lon: float,
+        granularity: Granularity,
+        radius_km: float | None = None,
+    ) -> LightningResponse:
+        """Get lightning strike counts near a location.
 
-        data_points = self._aggregate_thunder_as_probability(raw_data.get("value", []), granularity)
+        Uses the SMHI Lightning Archive API to count strikes within
+        *radius_km* of (lat, lon).
+        """
+        radius = radius_km or settings.lightning_search_radius_km
+        today = date.today()
+        start = date(today.year - _LIGHTNING_YEARS_BACK, today.month, 1)
+
+        daily_counts = await self._lightning_client.get_strikes_in_range(
+            lat, lon, radius, start, today,
+        )
+        data_points = self._aggregate_lightning_strikes(daily_counts, granularity)
 
         return LightningResponse(
-            station_name=station.name,
-            station_id=station.id,
-            latitude=station.latitude,
-            longitude=station.longitude,
+            latitude=lat,
+            longitude=lon,
+            radius_km=radius,
             granularity=granularity,
             data=data_points,
         )
 
-    async def get_combined_weather(self, lat: float, lon: float, granularity: Granularity) -> CombinedWeatherResponse:
+    async def get_combined_weather(
+        self,
+        lat: float,
+        lon: float,
+        granularity: Granularity,
+        radius_km: float | None = None,
+    ) -> CombinedWeatherResponse:
         """Get both cloud cover and lightning data in one call."""
+        # Cloud cover from meteorological observations
         cloud_station = await self._find_best_station(PARAM_CLOUD_COVER, lat, lon)
         cloud_raw = await self._client.get_station_data(PARAM_CLOUD_COVER, cloud_station.id)
         cloud_data = self._aggregate_values(cloud_raw.get("value", []), granularity)
 
-        # For lightning, might be a different station
+        # Lightning from SMHI Lightning Archive
         try:
-            thunder_station = await self._find_best_station(PARAM_THUNDER_DAYS, lat, lon)
-            thunder_raw = await self._client.get_station_data(PARAM_THUNDER_DAYS, thunder_station.id)
-            lightning_data = self._aggregate_thunder_as_probability(thunder_raw.get("value", []), granularity)
+            radius = radius_km or settings.lightning_search_radius_km
+            today = date.today()
+            start = date(today.year - _LIGHTNING_YEARS_BACK, today.month, 1)
+
+            daily_counts = await self._lightning_client.get_strikes_in_range(
+                lat, lon, radius, start, today,
+            )
+            lightning_data = self._aggregate_lightning_strikes(daily_counts, granularity)
         except ValueError as e:
-            logger.warning(f"Could not get thunder data: {e}. Returning empty lightning data.")
+            logger.warning(f"Could not get lightning data: {e}. Returning empty.")
             lightning_data = []
         except Exception as e:
-            logger.error(f"Unexpected error fetching thunder data: {e}. Returning empty lightning data.")
+            logger.error(f"Unexpected error fetching lightning data: {e}", exc_info=True)
             lightning_data = []
 
         return CombinedWeatherResponse(

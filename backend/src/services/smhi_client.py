@@ -16,7 +16,6 @@ SMHI_BASE_URL = "https://opendata-download-metobs.smhi.se/api"
 
 # SMHI Metobs parameter IDs
 PARAM_CLOUD_COVER = 16  # Total cloud cover (mean, percent 0–100)
-PARAM_THUNDER_DAYS = 30  # Number of days with thunder (monthly)
 
 
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:

@@ -45,7 +45,7 @@ class ForecastService:
         metric: str,
         months_ahead: int = 12,
     ) -> ForecastResponse:
-        """Forecast cloud cover or lightning probability.
+        """Forecast cloud cover or lightning strike counts.
 
         Uses monthly historical data with a Ridge regression model
         capturing trend + seasonality.
@@ -56,10 +56,11 @@ class ForecastService:
             station_name = response.station_name
             station_id = response.station_id
         elif metric == "lightning":
-            response = await self._smhi_service.get_lightning(lat, lon, Granularity.MONTH)
-            historical = response.data
-            station_name = response.station_name
-            station_id = response.station_id
+            lightning_resp = await self._smhi_service.get_lightning(lat, lon, Granularity.MONTH)
+            historical = lightning_resp.data
+            # Lightning responses don't have station_name/id — use placeholder
+            station_name = f"Area ({lat:.2f}, {lon:.2f})"
+            station_id = 0
         else:
             raise ValueError(f"Unknown metric: {metric}. Use 'cloud_cover' or 'lightning'.")
 
