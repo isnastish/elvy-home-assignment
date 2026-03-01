@@ -41,6 +41,7 @@ jobs:
           service: smhi-weather-backend
           region: ${{ env.REGION }}
           image: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/smhi-weather-app/backend:${{ github.sha }}
+          flags: '--allow-unauthenticated'
 
   deploy-frontend:
     name: Deploy Frontend
@@ -82,3 +83,4 @@ jobs:
           service: smhi-weather-frontend
           region: ${{ env.REGION }}
           image: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/smhi-weather-app/frontend:${{ github.sha }}
+          flags: '--allow-unauthenticated'

@@ -112,14 +112,23 @@ The frontend uses a build-time variable:
 
 ## Deployment
 
-### Terraform (Google Cloud Run)
+### Quick Setup
+
+For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).
+
+**Quick start:**
 
 ```bash
+# 1. Run setup script (automates GCloud configuration)
+./scripts/setup-gcloud.sh your-project-id
+
+# 2. Configure GitHub secrets (see DEPLOYMENT.md for details)
+
+# 3. Deploy with Terraform
 cd terraform
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your values
 terraform init
-terraform plan -var="project_id=YOUR_GCP_PROJECT" \
-               -var="backend_image=YOUR_BACKEND_IMAGE" \
-               -var="frontend_image=YOUR_FRONTEND_IMAGE"
 terraform apply
 ```
 
@@ -128,10 +137,16 @@ terraform apply
 - **CI** (`ci.yml`) — runs on every push/PR to `main`: lints, tests, type-checks, and builds
 - **CD** (`cd.yml`) — runs on push to `main`: builds Docker images, pushes to Artifact Registry, deploys to Cloud Run
 
-Required GitHub secrets/variables:
-- `GCP_PROJECT_ID` (variable)
-- `WIF_PROVIDER` (secret) — Workload Identity Federation provider
-- `WIF_SERVICE_ACCOUNT` (secret) — GCP service account
+**Required GitHub Configuration:**
+
+1. **Repository Variables:**
+   - `GCP_PROJECT_ID` — Your GCP project ID
+
+2. **Repository Secrets:**
+   - `WIF_PROVIDER` — Workload Identity Federation provider (full resource name)
+   - `WIF_SERVICE_ACCOUNT` — GCP service account email (e.g., `github-actions@PROJECT_ID.iam.gserviceaccount.com`)
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for complete setup instructions.
 
 
 ## Data Sources
