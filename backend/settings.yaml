@@ -1,7 +1,5 @@
 # SMHI Weather Analytics API Configuration
 
-app_name: "SMHI Weather Analytics API"
-
 # CORS Configuration
 # Note: For production deployment, CORS_ORIGINS is set via environment variables
 # to use the actual Cloud Run frontend URL. These defaults are for local development.

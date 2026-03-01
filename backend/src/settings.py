@@ -106,7 +106,6 @@ class GeocodingSettings(BaseModel):
 class AppSettings(YamlSettings):
     """Application settings loaded from YAML file with environment variable overrides."""
 
-    app_name: str = Field(..., description="Application name")
     cors: CorsSettings = Field(..., description="CORS configuration")
     smhi: SmhiSettings = Field(..., description="SMHI API configuration")
     lightning: LightningSettings = Field(..., description="Lightning Archive configuration")
