@@ -138,15 +138,42 @@ class LightningClient:
         """
         min_lat, max_lat, min_lon, max_lon = _bounding_box(lat, lon, radius_km)
 
-        # Build list of (year, month, day) tuples to fetch
+        # First, get available days for each month to avoid fetching empty days
+        months_to_check: set[tuple[int, int]] = set()
+        current = start_date.replace(day=1)  # Start from first day of month
+        while current <= end_date:
+            months_to_check.add((current.year, current.month))
+            # Move to first day of next month
+            if current.month == 12:
+                current = date(current.year + 1, 1, 1)
+            else:
+                current = date(current.year, current.month + 1, 1)
+
+        # Get available days for all months concurrently
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            month_tasks = [self.get_available_days(y, m) for y, m in months_to_check]
+            available_days_by_month = await asyncio.gather(*month_tasks, return_exceptions=True)
+
+        # Build map of (year, month) -> available days
+        available_days_map: dict[tuple[int, int], list[int]] = {}
+        for (y, m), result in zip(months_to_check, available_days_by_month):
+            if isinstance(result, Exception):
+                logger.warning(f"Failed to get available days for {y}-{m:02d}: {result}")
+                continue
+            if result:
+                available_days_map[(y, m)] = result
+
+        # Build list of (year, month, day) tuples to fetch - only for available days
         days_to_fetch: list[tuple[int, int, int]] = []
         current = start_date
         while current <= end_date:
-            days_to_fetch.append((current.year, current.month, current.day))
+            available = available_days_map.get((current.year, current.month), [])
+            if current.day in available:
+                days_to_fetch.append((current.year, current.month, current.day))
             current += timedelta(days=1)
 
         logger.info(
-            f"Fetching {len(days_to_fetch)} days of lightning data "
+            f"Fetching {len(days_to_fetch)} days of lightning data (out of {(end_date - start_date).days + 1} total) "
             f"({start_date} → {end_date}) for ({lat}, {lon}), radius={radius_km}km"
         )
 
