@@ -47,50 +47,114 @@ export function WeatherChart({ data }: WeatherChartProps) {
   }
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <Box sx={{ textAlign: "center", color: "text.secondary", fontSize: "0.875rem" }}>
-        <Typography variant="body2">
-          Station: <strong>{data.station_name}</strong> (ID: {data.station_id}) — {data.latitude.toFixed(4)}°N, {data.longitude.toFixed(4)}°E
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 5 }}>
+      <Box 
+        sx={{ 
+          textAlign: "center", 
+          p: 2.5,
+          bgcolor: "grey.50",
+          borderRadius: 2,
+          border: "1px solid",
+          borderColor: "divider",
+        }}
+      >
+        <Typography variant="body2" sx={{ color: "text.secondary", fontWeight: 500 }}>
+          Data Source: <strong style={{ color: "#1a365d" }}>{data.station_name}</strong> (Station ID: {data.station_id})
+        </Typography>
+        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>
+          Coordinates: {data.latitude.toFixed(4)}°N, {data.longitude.toFixed(4)}°E
         </Typography>
       </Box>
 
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, 1fr)" }, gap: 2 }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, 1fr)" }, gap: 2.5 }}>
         {cloudStats && (
           <>
-            <Paper sx={{ p: 2, textAlign: "center", bgcolor: "primary.50" }}>
-              <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 500, textTransform: "uppercase" }}>
-                Avg Cloud Cover
+            <Paper 
+              elevation={0}
+              sx={{ 
+                p: 3, 
+                textAlign: "center", 
+                background: "linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%)",
+                border: "1px solid",
+                borderColor: "info.300",
+                borderRadius: 2,
+              }}
+            >
+              <Typography variant="caption" sx={{ color: "info.dark", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.7rem" }}>
+                Average Cloud Cover
               </Typography>
-              <Typography variant="h6" sx={{ color: "primary.main", fontWeight: 700, mt: 0.5 }}>
+              <Typography variant="h5" sx={{ color: "info.dark", fontWeight: 700, mt: 1.5, mb: 0.5 }}>
                 {cloudStats.avg}%
               </Typography>
-            </Paper>
-            <Paper sx={{ p: 2, textAlign: "center", bgcolor: "primary.50" }}>
-              <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 500, textTransform: "uppercase" }}>
-                Max Cloud Cover
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem" }}>
+                Mean value
               </Typography>
-              <Typography variant="h6" sx={{ color: "primary.main", fontWeight: 700, mt: 0.5 }}>
+            </Paper>
+            <Paper 
+              elevation={0}
+              sx={{ 
+                p: 3, 
+                textAlign: "center", 
+                background: "linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%)",
+                border: "1px solid",
+                borderColor: "info.300",
+                borderRadius: 2,
+              }}
+            >
+              <Typography variant="caption" sx={{ color: "info.dark", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.7rem" }}>
+                Maximum Cloud Cover
+              </Typography>
+              <Typography variant="h5" sx={{ color: "info.dark", fontWeight: 700, mt: 1.5, mb: 0.5 }}>
                 {cloudStats.max}%
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem" }}>
+                Peak value
               </Typography>
             </Paper>
           </>
         )}
         {lightningStats && (
           <>
-            <Paper sx={{ p: 2, textAlign: "center", bgcolor: "warning.50" }}>
-              <Typography variant="caption" sx={{ color: "warning.main", fontWeight: 500, textTransform: "uppercase" }}>
-                Total Strikes
+            <Paper 
+              elevation={0}
+              sx={{ 
+                p: 3, 
+                textAlign: "center", 
+                background: "linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(251, 191, 36, 0.1) 100%)",
+                border: "1px solid",
+                borderColor: "warning.300",
+                borderRadius: 2,
+              }}
+            >
+              <Typography variant="caption" sx={{ color: "warning.dark", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.7rem" }}>
+                Total Lightning Strikes
               </Typography>
-              <Typography variant="h6" sx={{ color: "warning.main", fontWeight: 700, mt: 0.5 }}>
+              <Typography variant="h5" sx={{ color: "warning.dark", fontWeight: 700, mt: 1.5, mb: 0.5 }}>
                 {lightningStats.total.toLocaleString()}
               </Typography>
-            </Paper>
-            <Paper sx={{ p: 2, textAlign: "center", bgcolor: "warning.50" }}>
-              <Typography variant="caption" sx={{ color: "warning.main", fontWeight: 500, textTransform: "uppercase" }}>
-                Peak Strikes
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem" }}>
+                All periods
               </Typography>
-              <Typography variant="h6" sx={{ color: "warning.main", fontWeight: 700, mt: 0.5 }}>
+            </Paper>
+            <Paper 
+              elevation={0}
+              sx={{ 
+                p: 3, 
+                textAlign: "center", 
+                background: "linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(251, 191, 36, 0.1) 100%)",
+                border: "1px solid",
+                borderColor: "warning.300",
+                borderRadius: 2,
+              }}
+            >
+              <Typography variant="caption" sx={{ color: "warning.dark", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.7rem" }}>
+                Peak Lightning Strikes
+              </Typography>
+              <Typography variant="h5" sx={{ color: "warning.dark", fontWeight: 700, mt: 1.5, mb: 0.5 }}>
                 {lightningStats.max.toLocaleString()}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem" }}>
+                Maximum value
               </Typography>
             </Paper>
           </>
@@ -98,9 +162,21 @@ export function WeatherChart({ data }: WeatherChartProps) {
       </Box>
 
       {cloudData.length > 0 && (
-        <Paper sx={{ p: 3 }}>
-          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-            Cloud Cover (%)
+        <Paper 
+          elevation={0}
+          sx={{ 
+            p: 4,
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 2,
+            bgcolor: "background.paper",
+          }}
+        >
+          <Typography variant="h6" sx={{ mb: 3, fontWeight: 600, color: "text.primary" }}>
+            Cloud Cover Analysis
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 3, color: "text.secondary" }}>
+            Percentage of sky covered by clouds (0% = clear, 100% = overcast)
           </Typography>
           <BarChart
             xAxis={[
@@ -113,20 +189,33 @@ export function WeatherChart({ data }: WeatherChartProps) {
             series={[
               {
                 data: cloudData.map((d) => d.value),
-                color: "#64b5f6",
+                color: "#0ea5e9",
               },
             ]}
             yAxis={[{ label: "Cloud Cover (%)" }]}
-            height={300}
-            margin={{ top: 20, right: 20, bottom: 60, left: 60 }}
+            height={320}
+            margin={{ top: 20, right: 30, bottom: 70, left: 70 }}
+            grid={{ vertical: true, horizontal: true }}
           />
         </Paper>
       )}
 
       {lightningData.length > 0 && (
-        <Paper sx={{ p: 3 }}>
-          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-            Lightning Strikes
+        <Paper 
+          elevation={0}
+          sx={{ 
+            p: 4,
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 2,
+            bgcolor: "background.paper",
+          }}
+        >
+          <Typography variant="h6" sx={{ mb: 3, fontWeight: 600, color: "text.primary" }}>
+            Lightning Strike Analysis
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 3, color: "text.secondary" }}>
+            Number of lightning strikes detected within the search radius
           </Typography>
           <BarChart
             xAxis={[
@@ -139,12 +228,13 @@ export function WeatherChart({ data }: WeatherChartProps) {
             series={[
               {
                 data: lightningData.map((d) => d.value),
-                color: "#fbbf24",
+                color: "#f59e0b",
               },
             ]}
-            yAxis={[{ label: "Strikes" }]}
-            height={300}
-            margin={{ top: 20, right: 20, bottom: 60, left: 60 }}
+            yAxis={[{ label: "Lightning Strikes" }]}
+            height={320}
+            margin={{ top: 20, right: 30, bottom: 70, left: 70 }}
+            grid={{ vertical: true, horizontal: true }}
           />
         </Paper>
       )}

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { TextField, Autocomplete, CircularProgress, Box } from "@mui/material";
+import { TextField, Autocomplete, CircularProgress, Box, Typography } from "@mui/material";
 import type { GeocodeResult } from "../types/weather";
 import { useLocations } from "../hooks/useLocations";
 
@@ -31,7 +31,7 @@ export function AddressInput({ onLocationSelect }: AddressInputProps) {
   }));
 
   return (
-    <Box sx={{ width: "100%", maxWidth: 600 }}>
+    <Box sx={{ width: "100%" }}>
       <Autocomplete
         freeSolo
         options={options}
@@ -46,9 +46,16 @@ export function AddressInput({ onLocationSelect }: AddressInputProps) {
         renderInput={(params) => (
           <TextField
             {...params}
-            placeholder="Enter a Swedish address or city..."
+            placeholder="Search for a Swedish address or city (e.g., Stockholm, Göteborg, Malmö)..."
             error={!!error}
             helperText={error}
+            fullWidth
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: 2,
+                bgcolor: "background.paper",
+              },
+            }}
             InputProps={{
               ...params.InputProps,
               endAdornment: (
@@ -61,15 +68,36 @@ export function AddressInput({ onLocationSelect }: AddressInputProps) {
           />
         )}
         renderOption={(props, option) => (
-          <Box component="li" {...props} key={option.id}>
-            <Box>
-              <Box sx={{ fontWeight: 500 }}>{option.label}</Box>
-              <Box sx={{ fontSize: "0.75rem", color: "text.secondary", mt: 0.5 }}>
-                {option.result.latitude.toFixed(4)}, {option.result.longitude.toFixed(4)}
-              </Box>
+          <Box 
+            component="li" 
+            {...props} 
+            key={option.id}
+            sx={{
+              py: 1.5,
+              px: 2,
+              "&:hover": {
+                bgcolor: "action.hover",
+              },
+            }}
+          >
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="body1" sx={{ fontWeight: 500, color: "text.primary", mb: 0.5 }}>
+                {option.label}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.75rem" }}>
+                {option.result.latitude.toFixed(4)}°N, {option.result.longitude.toFixed(4)}°E
+              </Typography>
             </Box>
           </Box>
         )}
+        sx={{
+          "& .MuiAutocomplete-paper": {
+            borderRadius: 2,
+            boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.05), 0px 2px 4px rgba(0, 0, 0, 0.06)",
+            border: "1px solid",
+            borderColor: "divider",
+          },
+        }}
       />
     </Box>
   );
