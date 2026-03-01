@@ -34,10 +34,7 @@ def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     R = 6371.0
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
-    a = (
-        math.sin(dlat / 2) ** 2
-        + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
-    )
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
@@ -120,10 +117,7 @@ class LightningClient:
         if cached is not None:
             return cached
 
-        url = (
-            f"{SMHI_LIGHTNING_BASE_URL}/version/latest"
-            f"/year/{year}/month/{month}/day/{day}/data.json"
-        )
+        url = f"{SMHI_LIGHTNING_BASE_URL}/version/latest/year/{year}/month/{month}/day/{day}/data.json"
         data = await self._fetch_json(client, url)
         strikes = data.get("values", []) if data else []
         self._set_cached(cache_key, strikes)
@@ -159,9 +153,7 @@ class LightningClient:
         # Fetch all days concurrently (throttled by semaphore)
         daily_counts: dict[date, int] = {}
         async with httpx.AsyncClient(timeout=30.0) as client:
-            tasks = [
-                self._fetch_day_strikes(client, y, m, d) for y, m, d in days_to_fetch
-            ]
+            tasks = [self._fetch_day_strikes(client, y, m, d) for y, m, d in days_to_fetch]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for (y, m, d), result in zip(days_to_fetch, results):
@@ -184,8 +176,5 @@ class LightningClient:
             if count > 0:
                 daily_counts[date(y, m, d)] = count
 
-        logger.info(
-            f"Found {sum(daily_counts.values())} strikes across "
-            f"{len(daily_counts)} days near ({lat}, {lon})"
-        )
+        logger.info(f"Found {sum(daily_counts.values())} strikes across {len(daily_counts)} days near ({lat}, {lon})")
         return daily_counts

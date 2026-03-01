@@ -112,10 +112,7 @@ class SmhiService:
             key = SmhiService._period_key(day, granularity)
             buckets[key] += count
 
-        return [
-            WeatherDataPoint(period=period, value=float(total))
-            for period, total in sorted(buckets.items())
-        ]
+        return [WeatherDataPoint(period=period, value=float(total)) for period, total in sorted(buckets.items())]
 
     # ------------------------------------------------------------------ #
     # Station lookup
@@ -171,7 +168,11 @@ class SmhiService:
         start = date(today.year - _LIGHTNING_YEARS_BACK, today.month, 1)
 
         daily_counts = await self._lightning_client.get_strikes_in_range(
-            lat, lon, radius, start, today,
+            lat,
+            lon,
+            radius,
+            start,
+            today,
         )
         data_points = self._aggregate_lightning_strikes(daily_counts, granularity)
 
@@ -203,7 +204,11 @@ class SmhiService:
             start = date(today.year - _LIGHTNING_YEARS_BACK, today.month, 1)
 
             daily_counts = await self._lightning_client.get_strikes_in_range(
-                lat, lon, radius, start, today,
+                lat,
+                lon,
+                radius,
+                start,
+                today,
             )
             lightning_data = self._aggregate_lightning_strikes(daily_counts, granularity)
         except ValueError as e:

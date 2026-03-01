@@ -12,7 +12,7 @@ from src.models.weather import (
 )
 from src.services.smhi_service import SmhiService
 
-logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 def _build_seasonal_features(n_points: int, periods_per_cycle: int = 12) -> np.ndarray:
@@ -64,7 +64,10 @@ class ForecastService:
         else:
             raise ValueError(f"Unknown metric: {metric}. Use 'cloud_cover' or 'lightning'.")
 
-        if len(historical) < 24:
+        if len(historical) < 6:
+            _logger.warning(
+                f"Not enough data for meaningful forecast: {len(historical)} months. Returning empty forecast."
+            )
             # Not enough data for meaningful forecast — return empty
             return ForecastResponse(
                 station_name=station_name,
