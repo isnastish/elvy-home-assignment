@@ -9,7 +9,7 @@ from src.dependencies import get_forecast_service
 from src.models.weather import ForecastMetric, ForecastResponse
 from src.services.forecast_service import ForecastService
 
-logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/forecast",
@@ -42,5 +42,5 @@ async def get_forecast(
     Uses a Ridge regression model with seasonal decomposition trained on
     historical SMHI data to predict future values with confidence intervals.
     """
-    logger.info(f"Forecasting {metric} for ({lat}, {lon}), {months_ahead} months ahead")
+    _logger.info(f"Forecasting {metric} for ({lat}, {lon}), {months_ahead} months ahead")
     return await forecast_service.forecast(lat, lon, metric, months_ahead)

@@ -10,7 +10,7 @@ from src.routes import forecast, locations, weather
 from src.settings import settings
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 V1_API_PREFIX = "/api/v1"
 

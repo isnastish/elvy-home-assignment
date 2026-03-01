@@ -30,7 +30,7 @@ from src.services.lightning_client import LightningClient
 from src.services.smhi_client import PARAM_CLOUD_COVER, SmhiClient
 from src.settings import settings
 
-logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 class SmhiService:
@@ -164,6 +164,11 @@ class SmhiService:
         today = date.today()
         start = date(today.year - settings.lightning.years_back, today.month, 1)
 
+        _logger.info(
+            f"Fetching lightning data for ({lat}, {lon}), radius={radius}km, "
+            f"date range: {start} to {today}, granularity={granularity.value}"
+        )
+
         daily_counts = await self._lightning_client.get_strikes_in_range(
             lat,
             lon,
@@ -171,7 +176,14 @@ class SmhiService:
             start,
             today,
         )
+
+        _logger.info(
+            f"Found {len(daily_counts)} days with lightning strikes (total {sum(daily_counts.values())} strikes)"
+        )
+
         data_points = self._aggregate_lightning_strikes(daily_counts, granularity)
+
+        _logger.info(f"Aggregated to {len(data_points)} data points at {granularity.value} granularity")
 
         return LightningResponse(
             latitude=lat,
@@ -200,6 +212,11 @@ class SmhiService:
             today = date.today()
             start = date(today.year - settings.lightning.years_back, today.month, 1)
 
+            _logger.info(
+                f"Fetching lightning data for ({lat}, {lon}), radius={radius}km, "
+                f"date range: {start} to {today}, granularity={granularity.value}"
+            )
+
             daily_counts = await self._lightning_client.get_strikes_in_range(
                 lat,
                 lon,
@@ -207,12 +224,19 @@ class SmhiService:
                 start,
                 today,
             )
+
+            _logger.info(
+                f"Found {len(daily_counts)} days with lightning strikes (total {sum(daily_counts.values())} strikes)"
+            )
+
             lightning_data = self._aggregate_lightning_strikes(daily_counts, granularity)
+
+            _logger.info(f"Aggregated to {len(lightning_data)} data points at {granularity.value} granularity")
         except ValueError as e:
-            logger.warning(f"Could not get lightning data: {e}. Returning empty.")
+            _logger.warning(f"Could not get lightning data: {e}. Returning empty.", exc_info=True)
             lightning_data = []
         except Exception as e:
-            logger.error(f"Unexpected error fetching lightning data: {e}", exc_info=True)
+            _logger.error(f"Unexpected error fetching lightning data: {e}", exc_info=True)
             lightning_data = []
 
         return CombinedWeatherResponse(
