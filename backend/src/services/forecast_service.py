@@ -7,6 +7,7 @@ from sklearn.linear_model import Ridge
 
 from src.models.weather import (
     ForecastDataPoint,
+    ForecastMetric,
     ForecastResponse,
     Granularity,
 )
@@ -42,7 +43,7 @@ class ForecastService:
         self,
         lat: float,
         lon: float,
-        metric: str,
+        metric: ForecastMetric,
         months_ahead: int = 12,
     ) -> ForecastResponse:
         """Forecast cloud cover or lightning strike counts.
@@ -50,12 +51,12 @@ class ForecastService:
         Uses monthly historical data with a Ridge regression model
         capturing trend + seasonality.
         """
-        if metric == "cloud_cover":
+        if metric == ForecastMetric.CLOUD_COVER:
             response = await self._smhi_service.get_cloud_cover(lat, lon, Granularity.MONTH)
             historical = response.data
             station_name = response.station_name
             station_id = response.station_id
-        elif metric == "lightning":
+        elif metric == ForecastMetric.LIGHTNING:
             lightning_resp = await self._smhi_service.get_lightning(lat, lon, Granularity.MONTH)
             historical = lightning_resp.data
             # Lightning responses don't have station_name/id — use placeholder

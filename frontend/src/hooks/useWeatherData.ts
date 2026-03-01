@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import type {
   CombinedWeatherResponse,
+  ForecastMetric,
   ForecastResponse,
   Granularity,
 } from "../types/weather";
@@ -12,7 +13,7 @@ interface UseWeatherDataReturn {
   loading: boolean;
   error: string | null;
   fetchWeather: (lat: number, lon: number, granularity: Granularity) => Promise<void>;
-  fetchForecast: (lat: number, lon: number, metric: string) => Promise<void>;
+  fetchForecast: (lat: number, lon: number, metric: ForecastMetric) => Promise<void>;
 }
 
 export function useWeatherData(): UseWeatherDataReturn {
@@ -43,7 +44,7 @@ export function useWeatherData(): UseWeatherDataReturn {
   );
 
   const fetchForecast = useCallback(
-    async (lat: number, lon: number, metric: string) => {
+    async (lat: number, lon: number, metric: ForecastMetric) => {
       setLoading(true);
       setError(null);
       try {

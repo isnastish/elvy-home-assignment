@@ -6,7 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 
 from src.dependencies import get_forecast_service
-from src.models.weather import ForecastResponse
+from src.models.weather import ForecastMetric, ForecastResponse
 from src.services.forecast_service import ForecastService
 
 logger = logging.getLogger(__name__)
@@ -25,8 +25,8 @@ router = APIRouter(
 async def get_forecast(
     lat: float = Query(description="Latitude of the location"),
     lon: float = Query(description="Longitude of the location"),
-    metric: str = Query(
-        default="cloud_cover",
+    metric: ForecastMetric = Query(
+        default=ForecastMetric.CLOUD_COVER,
         description="Metric to forecast: 'cloud_cover' or 'lightning'",
     ),
     months_ahead: int = Query(
