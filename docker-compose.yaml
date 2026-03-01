@@ -6,9 +6,12 @@ services:
       - "8000:8080"
     volumes:
       - ./backend/src:/code/src
+      - ./backend/settings.yaml:/code/settings.yaml:ro
     environment:
-      - CORS_ORIGINS=["http://localhost:3000","http://localhost:5173"]
-      - SMHI_CACHE_TTL_HOURS=6
+      # Environment variables override settings.yaml values
+      # Use double underscore (__) for nested settings: CORS__ORIGINS maps to cors.origins
+      - CORS__ORIGINS=["http://localhost:3000","http://localhost:5173"]
+      - SMHI__CACHE_TTL_HOURS=6
     restart: on-failure
 
   frontend:

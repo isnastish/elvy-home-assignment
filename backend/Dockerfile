@@ -20,5 +20,6 @@ COPY entrypoint.sh /code/entrypoint.sh
 RUN chmod +x entrypoint.sh
 
 COPY src /code/src
+COPY settings.yaml /code/settings.yaml
 
 ENTRYPOINT ["./entrypoint.sh"]

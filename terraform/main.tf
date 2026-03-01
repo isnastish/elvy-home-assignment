@@ -49,7 +49,7 @@ resource "google_cloud_run_v2_service" "backend" {
       }
 
       env {
-        name  = "CORS_ORIGINS"
+        name  = "CORS__ORIGINS"
         value = jsonencode(length(var.cors_origins) > 0 ? var.cors_origins : [google_cloud_run_v2_service.frontend.uri])
       }
 
