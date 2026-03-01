@@ -9,8 +9,6 @@ from src.settings import settings
 
 logger = logging.getLogger(__name__)
 
-NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
-
 
 class GeocodingService:
     """Service for geocoding addresses to coordinates."""
@@ -23,16 +21,16 @@ class GeocodingService:
         params = {
             "q": address,
             "format": "json",
-            "countrycodes": "se",
-            "limit": 5,
+            "countrycodes": ",".join(settings.geocoding.country_codes),
+            "limit": settings.geocoding.limit,
             "addressdetails": 1,
         }
         headers = {
-            "User-Agent": settings.geocoding_user_agent,
+            "User-Agent": settings.geocoding.user_agent,
         }
 
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(NOMINATIM_URL, params=params, headers=headers)
+            response = await client.get(settings.geocoding.service_url, params=params, headers=headers)
             response.raise_for_status()
             data = response.json()
 

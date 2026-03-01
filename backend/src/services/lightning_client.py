@@ -26,8 +26,6 @@ from src.settings import settings
 
 logger = logging.getLogger(__name__)
 
-SMHI_LIGHTNING_BASE_URL = "https://opendata-download-lightning.smhi.se/api"
-
 
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Haversine distance in km between two (lat, lon) points."""
@@ -55,7 +53,7 @@ class LightningClient:
 
     def __init__(self, max_concurrent: int = 25) -> None:
         self._cache: dict[str, tuple[datetime, Any]] = {}
-        self._ttl = timedelta(hours=settings.smhi_cache_ttl_hours)
+        self._ttl = timedelta(hours=settings.smhi.cache_ttl_hours)
         self._semaphore = asyncio.Semaphore(max_concurrent)
 
     # -- caching helpers -------------------------------------------------- #
@@ -93,7 +91,7 @@ class LightningClient:
         if cached is not None:
             return cached
 
-        url = f"{SMHI_LIGHTNING_BASE_URL}/version/latest/year/{year}/month/{month}.json"
+        url = f"{settings.smhi.lightning_base_url}/version/latest/year/{year}/month/{month}.json"
         async with httpx.AsyncClient(timeout=30.0) as client:
             data = await self._fetch_json(client, url)
 
@@ -117,8 +115,9 @@ class LightningClient:
         if cached is not None:
             return cached
 
-        url = f"{SMHI_LIGHTNING_BASE_URL}/version/latest/year/{year}/month/{month}/day/{day}/data.json"
-        data = await self._fetch_json(client, url)
+        url = f"{settings.smhi.lightning_base_url}/version/latest/year/{year}/month/{month}/day/{day}/data.json"
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            data = await self._fetch_json(client, url)
         strikes = data.get("values", []) if data else []
         self._set_cached(cache_key, strikes)
         return strikes

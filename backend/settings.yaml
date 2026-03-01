@@ -1,0 +1,30 @@
+# SMHI Weather Analytics API Configuration
+
+# CORS Configuration
+# Note: For production deployment, CORS_ORIGINS is set via environment variables
+# to use the actual Cloud Run frontend URL. These defaults are for local development.
+cors:
+  origins:
+    - "http://localhost:3000"
+    - "http://localhost:5173"
+
+# SMHI API Configuration
+smhi:
+  base_url: "https://opendata-download-metobs.smhi.se/api"
+  lightning_base_url: "https://opendata-download-lightning.smhi.se/api"
+  cache_ttl_hours: 6
+  max_years_history: 10
+  parameters:
+    cloud_cover: 16  # Total cloud cover (mean, percent 0–100)
+
+# Lightning Archive Configuration
+lightning:
+  search_radius_km: 50.0
+  years_back: 3  # How many years of historical data to fetch
+
+# Geocoding Configuration
+geocoding:
+  service_url: "https://nominatim.openstreetmap.org/search"
+  user_agent: "smhi-weather-app/1.0"
+  country_codes: ["se"]
+  limit: 5

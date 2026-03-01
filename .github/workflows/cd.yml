@@ -84,3 +84,11 @@ jobs:
           region: ${{ env.REGION }}
           image: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/smhi-weather-app/frontend:${{ github.sha }}
           flags: '--allow-unauthenticated'
+
+      - name: Update backend CORS with frontend URL
+        run: |
+          FRONTEND_URL=$(gcloud run services describe smhi-weather-frontend --region=${{ env.REGION }} --format='value(status.url)')
+          gcloud run services update smhi-weather-backend \
+            --region=${{ env.REGION }} \
+            --update-env-vars="CORS__ORIGINS=[\"$FRONTEND_URL\"]" \
+            --quiet

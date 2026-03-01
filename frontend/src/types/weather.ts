@@ -65,10 +65,12 @@ export interface ForecastDataPoint {
   upper_bound: number;
 }
 
+export type ForecastMetric = "cloud_cover" | "lightning";
+
 export interface ForecastResponse {
   station_name: string;
   station_id: number;
-  metric: string;
+  metric: ForecastMetric;
   historical: WeatherDataPoint[];
   forecast: ForecastDataPoint[];
 }

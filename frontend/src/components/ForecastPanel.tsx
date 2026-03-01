@@ -1,12 +1,12 @@
 import { useState, useMemo } from "react";
 import { LineChart } from "@mui/x-charts/LineChart";
 import { Box, Typography, Paper, Button, Select, MenuItem, FormControl, CircularProgress } from "@mui/material";
-import type { ForecastResponse } from "../types/weather";
+import type { ForecastMetric, ForecastResponse } from "../types/weather";
 
 interface ForecastPanelProps {
   forecastData: ForecastResponse | null;
   loading: boolean;
-  onFetchForecast: (metric: string) => void;
+  onFetchForecast: (metric: ForecastMetric) => void;
 }
 
 function formatPeriod(period: string): string {
@@ -16,12 +16,12 @@ function formatPeriod(period: string): string {
   return period;
 }
 
-function metricLabel(metric: string): string {
+function metricLabel(metric: ForecastMetric): string {
   return metric === "cloud_cover" ? "Cloud Cover (%)" : "Lightning Strikes";
 }
 
 export function ForecastPanel({ forecastData, loading, onFetchForecast }: ForecastPanelProps) {
-  const [metric, setMetric] = useState<"cloud_cover" | "lightning">("cloud_cover");
+  const [metric, setMetric] = useState<ForecastMetric>("cloud_cover");
 
   const chartData = useMemo(() => {
     if (!forecastData) return null;

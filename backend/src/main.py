@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 V1_API_PREFIX = "/api/v1"
 
 app = FastAPI(
-    title=settings.app_name,
+    title="SMHI Weather Analytics API",
     description="API for visualizing SMHI cloud cover and lightning data for Swedish locations",
     version="1.0.0",
 )
@@ -23,7 +23,7 @@ app = FastAPI(
 # CORS — allow the React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=settings.cors.origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

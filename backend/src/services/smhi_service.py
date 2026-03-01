@@ -32,9 +32,6 @@ from src.settings import settings
 
 logger = logging.getLogger(__name__)
 
-# Default date range for lightning queries
-_LIGHTNING_YEARS_BACK = 3
-
 
 class SmhiService:
     """Service for retrieving and processing SMHI weather data."""
@@ -163,9 +160,9 @@ class SmhiService:
         Uses the SMHI Lightning Archive API to count strikes within
         *radius_km* of (lat, lon).
         """
-        radius = radius_km or settings.lightning_search_radius_km
+        radius = radius_km or settings.lightning.search_radius_km
         today = date.today()
-        start = date(today.year - _LIGHTNING_YEARS_BACK, today.month, 1)
+        start = date(today.year - settings.lightning.years_back, today.month, 1)
 
         daily_counts = await self._lightning_client.get_strikes_in_range(
             lat,
@@ -199,9 +196,9 @@ class SmhiService:
 
         # Lightning from SMHI Lightning Archive
         try:
-            radius = radius_km or settings.lightning_search_radius_km
+            radius = radius_km or settings.lightning.search_radius_km
             today = date.today()
-            start = date(today.year - _LIGHTNING_YEARS_BACK, today.month, 1)
+            start = date(today.year - settings.lightning.years_back, today.month, 1)
 
             daily_counts = await self._lightning_client.get_strikes_in_range(
                 lat,

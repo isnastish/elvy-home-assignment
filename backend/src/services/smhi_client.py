@@ -12,10 +12,8 @@ from src.settings import settings
 
 logger = logging.getLogger(__name__)
 
-SMHI_BASE_URL = "https://opendata-download-metobs.smhi.se/api"
-
-# SMHI Metobs parameter IDs
-PARAM_CLOUD_COVER = 16  # Total cloud cover (mean, percent 0–100)
+# SMHI Metobs parameter IDs - loaded from settings
+PARAM_CLOUD_COVER = settings.smhi.parameters.cloud_cover  # Total cloud cover (mean, percent 0–100)
 
 
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -32,7 +30,7 @@ class SmhiClient:
 
     def __init__(self) -> None:
         self._cache: dict[str, tuple[datetime, Any]] = {}
-        self._ttl = timedelta(hours=settings.smhi_cache_ttl_hours)
+        self._ttl = timedelta(hours=settings.smhi.cache_ttl_hours)
         self._stations_cache: dict[int, list[Station]] = {}
 
     def _get_cached(self, key: str) -> Any | None:
@@ -51,7 +49,7 @@ class SmhiClient:
         if parameter in self._stations_cache:
             return self._stations_cache[parameter]
 
-        url = f"{SMHI_BASE_URL}/version/latest/parameter/{parameter}.json"
+        url = f"{settings.smhi.base_url}/version/latest/parameter/{parameter}.json"
         logger.info(f"Fetching stations for parameter {parameter} from {url}")
 
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -113,7 +111,7 @@ class SmhiClient:
         async with httpx.AsyncClient(timeout=60.0) as client:
             for period in periods:
                 url = (
-                    f"{SMHI_BASE_URL}/version/latest"
+                    f"{settings.smhi.base_url}/version/latest"
                     f"/parameter/{parameter}"
                     f"/station/{station_id}"
                     f"/period/{period}/data.json"

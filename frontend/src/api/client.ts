@@ -1,6 +1,7 @@
 import axios from "axios";
 import type {
   CombinedWeatherResponse,
+  ForecastMetric,
   ForecastResponse,
   GeocodeResponse,
   Granularity,
@@ -51,7 +52,7 @@ export async function getCombinedWeather(
 export async function getForecast(
   lat: number,
   lon: number,
-  metric: string,
+  metric: ForecastMetric,
   monthsAhead: number = 12
 ): Promise<ForecastResponse> {
   const { data } = await api.get<ForecastResponse>("/forecast", {

@@ -9,6 +9,13 @@ class Granularity(StrEnum):
     YEAR = "year"
 
 
+class ForecastMetric(StrEnum):
+    """Metric types available for forecasting."""
+
+    CLOUD_COVER = "cloud_cover"
+    LIGHTNING = "lightning"
+
+
 class WeatherDataPoint(BaseModel):
     """A single data point for weather visualization."""
 
@@ -65,6 +72,6 @@ class ForecastResponse(BaseModel):
 
     station_name: str
     station_id: int
-    metric: str = Field(description="What is being forecasted: 'cloud_cover' or 'lightning'")
+    metric: ForecastMetric = Field(description="What is being forecasted: 'cloud_cover' or 'lightning'")
     historical: list[WeatherDataPoint]
     forecast: list[ForecastDataPoint]
