@@ -7,7 +7,7 @@ import httpx
 from src.models.location import GeocodeResponse, GeocodeResult
 from src.settings import settings
 
-logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 class GeocodingService:

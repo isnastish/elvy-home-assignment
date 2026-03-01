@@ -10,7 +10,7 @@ import httpx
 from src.models.location import Station
 from src.settings import settings
 
-logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 # SMHI Metobs parameter IDs - loaded from settings
 PARAM_CLOUD_COVER = settings.smhi.parameters.cloud_cover  # Total cloud cover (mean, percent 0–100)
@@ -50,7 +50,7 @@ class SmhiClient:
             return self._stations_cache[parameter]
 
         url = f"{settings.smhi.base_url}/version/latest/parameter/{parameter}.json"
-        logger.info(f"Fetching stations for parameter {parameter} from {url}")
+        _logger.info(f"Fetching stations for parameter {parameter} from {url}")
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(url)
@@ -116,18 +116,18 @@ class SmhiClient:
                     f"/station/{station_id}"
                     f"/period/{period}/data.json"
                 )
-                logger.info(f"Fetching data from {url}")
+                _logger.info(f"Fetching data from {url}")
                 try:
                     response = await client.get(url)
                     if response.status_code == 404:
-                        logger.warning(f"No data for period {period}, station {station_id}, param {parameter}")
+                        _logger.warning(f"No data for period {period}, station {station_id}, param {parameter}")
                         continue
                     response.raise_for_status()
                     data = response.json()
                     values = data.get("value", [])
                     all_values.extend(values)
                 except httpx.HTTPError as e:
-                    logger.warning(f"Failed to fetch {period} data: {e}")
+                    _logger.warning(f"Failed to fetch {period} data: {e}")
                     continue
 
         # Deduplicate by timestamp (prefer later entries)

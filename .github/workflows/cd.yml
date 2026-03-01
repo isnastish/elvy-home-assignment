@@ -88,7 +88,9 @@ jobs:
       - name: Update backend CORS with frontend URL
         run: |
           FRONTEND_URL=$(gcloud run services describe smhi-weather-frontend --region=${{ env.REGION }} --format='value(status.url)')
+          # JSON-encode the array properly for pydantic-settings (needs to be a valid JSON string)
+          CORS_VALUE="[\"$FRONTEND_URL\"]"
           gcloud run services update smhi-weather-backend \
             --region=${{ env.REGION }} \
-            --update-env-vars="CORS__ORIGINS=[\"$FRONTEND_URL\"]" \
+            --update-env-vars="CORS__ORIGINS=$CORS_VALUE" \
             --quiet

@@ -10,7 +10,7 @@ from src.models.location import GeocodeResponse, StationsResponse
 from src.services.geocoding_service import GeocodingService
 from src.services.smhi_service import SmhiService
 
-logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/locations",
@@ -31,7 +31,7 @@ async def geocode_address(
 
     Uses Nominatim (OpenStreetMap) with a Sweden bias.
     """
-    logger.info(f"Geocoding address: {address}")
+    _logger.info(f"Geocoding address: {address}")
     return await geocoding_service.geocode(address)
 
 
@@ -47,7 +47,7 @@ async def get_nearest_stations(
     smhi_service: Annotated[SmhiService, Depends(get_smhi_service)] = None,  # type: ignore
 ) -> StationsResponse:
     """Find SMHI weather stations nearest to the given coordinates."""
-    logger.info(f"Finding stations near ({lat}, {lon})")
+    _logger.info(f"Finding stations near ({lat}, {lon})")
     stations = await smhi_service.find_nearest_stations(lat, lon, limit)
 
     # Select the nearest active station
