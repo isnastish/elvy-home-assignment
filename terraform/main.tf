@@ -33,6 +33,8 @@ resource "google_cloud_run_v2_service" "backend" {
   name     = "smhi-weather-backend"
   location = var.region
 
+  depends_on = [google_cloud_run_v2_service.frontend]
+
   template {
     containers {
       image = var.backend_image
@@ -46,8 +48,18 @@ resource "google_cloud_run_v2_service" "backend" {
         value = "6"
       }
 
-      # CORS_ORIGINS should be set after first deploy via:
-      # gcloud run services update smhi-weather-backend --set-env-vars CORS_ORIGINS='["<frontend-url>"]'
+      env {
+        name  = "CORS_ORIGINS"
+        value = jsonencode(length(var.cors_origins) > 0 ? var.cors_origins : [google_cloud_run_v2_service.frontend.uri])
+      }
+
+      dynamic "env" {
+        for_each = var.backend_env_vars
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
 
       resources {
         limits = {

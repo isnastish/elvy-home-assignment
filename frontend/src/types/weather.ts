@@ -16,10 +16,9 @@ export interface CloudCoverResponse {
 }
 
 export interface LightningResponse {
-  station_name: string;
-  station_id: number;
   latitude: number;
   longitude: number;
+  radius_km: number;
   parameter_description: string;
   granularity: Granularity;
   data: WeatherDataPoint[];

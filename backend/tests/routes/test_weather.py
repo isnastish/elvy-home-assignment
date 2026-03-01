@@ -45,14 +45,13 @@ async def test_get_cloud_cover(client: TestClient, mock_smhi_service: AsyncMock)
 async def test_get_lightning(client: TestClient, mock_smhi_service: AsyncMock) -> None:
     """Test getting lightning data."""
     mock_smhi_service.get_lightning.return_value = LightningResponse(
-        station_name="Stockholm-Observatoriekullen",
-        station_id=98210,
         latitude=59.3419,
         longitude=18.0546,
+        radius_km=50.0,
         granularity=Granularity.MONTH,
         data=[
-            WeatherDataPoint(period="2024-06", value=8.33),
-            WeatherDataPoint(period="2024-07", value=12.5),
+            WeatherDataPoint(period="2024-06", value=42),
+            WeatherDataPoint(period="2024-07", value=128),
         ],
     )
 
@@ -61,7 +60,7 @@ async def test_get_lightning(client: TestClient, mock_smhi_service: AsyncMock) -
     assert response.status_code == 200
     data = response.json()
     assert len(data["data"]) == 2
-    assert data["data"][1]["value"] == 12.5
+    assert data["data"][1]["value"] == 128
     mock_smhi_service.get_lightning.assert_called_once()
 
 

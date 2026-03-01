@@ -1,15 +1,6 @@
-import { useState } from "react";
-import {
-  ComposedChart,
-  Area,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
+import { useState, useMemo } from "react";
+import { LineChart } from "@mui/x-charts/LineChart";
+import { Box, Typography, Paper, Button, Select, MenuItem, FormControl, CircularProgress } from "@mui/material";
 import type { ForecastResponse } from "../types/weather";
 
 interface ForecastPanelProps {
@@ -18,166 +9,157 @@ interface ForecastPanelProps {
   onFetchForecast: (metric: string) => void;
 }
 
-export function ForecastPanel({
-  forecastData,
-  loading,
-  onFetchForecast,
-}: ForecastPanelProps) {
-  const [metric, setMetric] = useState<"cloud_cover" | "lightning">(
-    "cloud_cover"
-  );
+function formatPeriod(period: string): string {
+  const parts = period.split("-");
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  if (parts.length >= 2) return `${months[parseInt(parts[1]) - 1]} '${parts[0].slice(2)}`;
+  return period;
+}
 
-  // Build chart data combining historical and forecast
-  const chartData: Array<{
-    period: string;
-    historical?: number;
-    predicted?: number;
-    lower_bound?: number;
-    upper_bound?: number;
-    confidence_range?: [number, number];
-  }> = [];
+function metricLabel(metric: string): string {
+  return metric === "cloud_cover" ? "Cloud Cover (%)" : "Lightning Strikes";
+}
 
-  if (forecastData) {
-    // Take last 24 months of historical data for context
-    const recentHistorical = forecastData.historical.slice(-24);
-    for (const point of recentHistorical) {
-      chartData.push({ period: point.period, historical: point.value });
-    }
-    for (const point of forecastData.forecast) {
-      chartData.push({
-        period: point.period,
-        predicted: point.predicted_value,
-        lower_bound: point.lower_bound,
-        upper_bound: point.upper_bound,
-        confidence_range: [point.lower_bound, point.upper_bound],
-      });
-    }
-  }
+export function ForecastPanel({ forecastData, loading, onFetchForecast }: ForecastPanelProps) {
+  const [metric, setMetric] = useState<"cloud_cover" | "lightning">("cloud_cover");
+
+  const chartData = useMemo(() => {
+    if (!forecastData) return null;
+
+    const recent = forecastData.historical.slice(-24);
+    const allPeriods = [...recent.map((p) => p.period), ...forecastData.forecast.map((p) => p.period)];
+    const historicalValues = [...recent.map((p) => p.value), ...Array(forecastData.forecast.length).fill(null)];
+    const predictedValues = [
+      ...Array(recent.length).fill(null),
+      ...forecastData.forecast.map((p) => p.predicted_value),
+    ];
+    const lowerBounds = [
+      ...Array(recent.length).fill(null),
+      ...forecastData.forecast.map((p) => p.lower_bound),
+    ];
+    const upperBounds = [
+      ...Array(recent.length).fill(null),
+      ...forecastData.forecast.map((p) => p.upper_bound),
+    ];
+
+    return { allPeriods, historicalValues, predictedValues, lowerBounds, upperBounds };
+  }, [forecastData]);
 
   return (
-    <div
-      style={{
-        background: "#fff",
-        borderRadius: 12,
-        padding: 24,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-        border: "1px solid #e8e8e8",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 16,
-        }}
-      >
-        <h3 style={{ margin: 0, fontSize: 18, color: "#333" }}>
-          AI Forecast
-        </h3>
-        <div style={{ display: "flex", gap: 8 }}>
-          <select
-            value={metric}
-            onChange={(e) =>
-              setMetric(e.target.value as "cloud_cover" | "lightning")
-            }
-            style={{
-              padding: "8px 12px",
-              borderRadius: 6,
-              border: "1px solid #ddd",
-              fontSize: 14,
-            }}
-          >
-            <option value="cloud_cover">Cloud Cover</option>
-            <option value="lightning">Lightning</option>
-          </select>
-          <button
+    <Paper sx={{ p: 3 }}>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3, flexWrap: "wrap", gap: 2 }}>
+        <Box>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            AI Forecast
+          </Typography>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            Ridge regression with seasonal decomposition
+          </Typography>
+        </Box>
+        <Box sx={{ display: "flex", gap: 2 }}>
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <Select value={metric} onChange={(e) => setMetric(e.target.value as "cloud_cover" | "lightning")}>
+              <MenuItem value="cloud_cover">Cloud Cover</MenuItem>
+              <MenuItem value="lightning">Lightning Strikes</MenuItem>
+            </Select>
+          </FormControl>
+          <Button
+            variant="contained"
             onClick={() => onFetchForecast(metric)}
             disabled={loading}
-            style={{
-              padding: "8px 20px",
-              borderRadius: 6,
-              border: "none",
-              background: loading ? "#ccc" : "#7c3aed",
-              color: "#fff",
-              cursor: loading ? "default" : "pointer",
-              fontSize: 14,
-              fontWeight: 500,
-            }}
+            sx={{ bgcolor: "secondary.main", "&:hover": { bgcolor: "secondary.dark" } }}
           >
-            {loading ? "Forecasting..." : "Generate Forecast"}
-          </button>
-        </div>
-      </div>
+            {loading ? <CircularProgress size={20} color="inherit" /> : "Generate Forecast"}
+          </Button>
+        </Box>
+      </Box>
 
-      {forecastData && chartData.length > 0 && (
+      {forecastData && chartData && (
         <>
-          <div
-            style={{
-              fontSize: 13,
-              color: "#888",
-              marginBottom: 8,
-              textAlign: "center",
-            }}
-          >
-            Forecast for {forecastData.station_name} — {forecastData.metric}
-          </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart
-              data={chartData}
-              margin={{ top: 10, right: 30, left: 20, bottom: 40 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis
-                dataKey="period"
-                angle={-45}
-                textAnchor="end"
-                height={60}
-                tick={{ fontSize: 10 }}
-              />
-              <YAxis />
-              <Tooltip
-                contentStyle={{
-                  borderRadius: 8,
-                  border: "1px solid #e0e0e0",
-                }}
-              />
-              <Legend />
-              <Line
-                type="monotone"
-                dataKey="historical"
-                name="Historical"
-                stroke="#2563eb"
-                strokeWidth={2}
-                dot={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="predicted"
-                name="Predicted"
-                stroke="#7c3aed"
-                strokeWidth={2}
-                strokeDasharray="5 5"
-                dot={{ r: 3 }}
-              />
-              <Area
-                type="monotone"
-                dataKey="confidence_range"
-                name="95% Confidence"
-                fill="#7c3aed"
-                fillOpacity={0.1}
-                stroke="none"
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
+          <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
+            <Paper sx={{ p: 2, flex: 1, minWidth: 120, textAlign: "center", bgcolor: "grey.50" }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", textTransform: "uppercase" }}>
+                Metric
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>
+                {metricLabel(forecastData.metric)}
+              </Typography>
+            </Paper>
+            <Paper sx={{ p: 2, flex: 1, minWidth: 120, textAlign: "center", bgcolor: "grey.50" }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", textTransform: "uppercase" }}>
+                Historical Points
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>
+                {forecastData.historical.length}
+              </Typography>
+            </Paper>
+            <Paper sx={{ p: 2, flex: 1, minWidth: 120, textAlign: "center", bgcolor: "secondary.50" }}>
+              <Typography variant="caption" sx={{ color: "secondary.main", textTransform: "uppercase" }}>
+                Forecast
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5, color: "secondary.main" }}>
+                {forecastData.forecast.length} months
+              </Typography>
+            </Paper>
+            <Paper sx={{ p: 2, flex: 1, minWidth: 120, textAlign: "center", bgcolor: "grey.50" }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", textTransform: "uppercase" }}>
+                Station
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>
+                {forecastData.station_name}
+              </Typography>
+            </Paper>
+          </Box>
+
+          <LineChart
+            xAxis={[
+              {
+                scaleType: "band",
+                data: chartData.allPeriods.map(formatPeriod),
+                label: "Period",
+              },
+            ]}
+            series={[
+              {
+                data: chartData.historicalValues,
+                label: "Historical",
+                color: "#2563eb",
+                showMark: false,
+              },
+              {
+                data: chartData.predictedValues,
+                label: "Predicted",
+                color: "#7c3aed",
+                curve: "linear",
+                showMark: true,
+              },
+              {
+                data: chartData.lowerBounds,
+                label: "Lower Bound (95% CI)",
+                color: "#a78bfa",
+                curve: "linear",
+                showMark: false,
+              },
+              {
+                data: chartData.upperBounds,
+                label: "Upper Bound (95% CI)",
+                color: "#a78bfa",
+                curve: "linear",
+                showMark: false,
+              },
+            ]}
+            yAxis={[{ label: metricLabel(forecastData.metric) }]}
+            height={320}
+            margin={{ top: 20, right: 30, left: 60, bottom: 60 }}
+          />
         </>
       )}
 
       {!forecastData && !loading && (
-        <div style={{ textAlign: "center", padding: 30, color: "#aaa" }}>
-          Select a metric and click "Generate Forecast" to see AI predictions.
-        </div>
+        <Box sx={{ textAlign: "center", py: 4, color: "text.secondary" }}>
+          <Typography>Select a metric and click "Generate Forecast" to see AI predictions.</Typography>
+        </Box>
       )}
-    </div>
+    </Paper>
   );
 }

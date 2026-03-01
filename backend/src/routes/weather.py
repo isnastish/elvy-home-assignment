@@ -1,4 +1,4 @@
-"""Routes for weather data (cloud cover and lightning)."""
+"""Routes for weather data (cloud cover and lightning strikes)."""
 
 import logging
 from typing import Annotated
@@ -36,7 +36,7 @@ async def get_cloud_cover(
     """Get historical cloud cover data for a location.
 
     Returns cloud cover data aggregated by the specified granularity (day, month, or year).
-    Cloud cover is measured in oktas (0-8 scale, where 0 = clear sky, 8 = overcast).
+    Cloud cover is measured as a percentage (0–100%, where 0% = clear sky, 100% = overcast).
     """
     logger.info(f"Getting cloud cover for ({lat}, {lon}) at {granularity} granularity")
     return await smhi_service.get_cloud_cover(lat, lon, granularity)
@@ -51,14 +51,16 @@ async def get_lightning(
     lat: float = Query(description="Latitude of the location"),
     lon: float = Query(description="Longitude of the location"),
     granularity: Granularity = Query(default=Granularity.MONTH, description="Aggregation granularity"),
+    radius_km: float = Query(default=50.0, description="Search radius in km"),
     smhi_service: Annotated[SmhiService, Depends(get_smhi_service)] = None,  # type: ignore
 ) -> LightningResponse:
-    """Get historical lightning/thunder probability for a location.
+    """Get historical lightning strike counts near a location.
 
-    Returns the probability of lightning strikes based on historical thunder day observations.
+    Counts lightning strikes from the SMHI Lightning Archive within *radius_km*
+    of the given coordinates.
     """
-    logger.info(f"Getting lightning data for ({lat}, {lon}) at {granularity} granularity")
-    return await smhi_service.get_lightning(lat, lon, granularity)
+    logger.info(f"Getting lightning data for ({lat}, {lon}) radius={radius_km}km at {granularity} granularity")
+    return await smhi_service.get_lightning(lat, lon, granularity, radius_km=radius_km)
 
 
 @router.get(
@@ -70,11 +72,12 @@ async def get_combined_weather(
     lat: float = Query(description="Latitude of the location"),
     lon: float = Query(description="Longitude of the location"),
     granularity: Granularity = Query(default=Granularity.MONTH, description="Aggregation granularity"),
+    radius_km: float = Query(default=50.0, description="Lightning search radius in km"),
     smhi_service: Annotated[SmhiService, Depends(get_smhi_service)] = None,  # type: ignore
 ) -> CombinedWeatherResponse:
     """Get both cloud cover and lightning data in a single request.
 
-    Returns cloud cover (oktas) and lightning probability (%) for the given location.
+    Returns cloud cover (%) and lightning strike counts for the given location.
     """
     logger.info(f"Getting combined weather for ({lat}, {lon}) at {granularity} granularity")
-    return await smhi_service.get_combined_weather(lat, lon, granularity)
+    return await smhi_service.get_combined_weather(lat, lon, granularity, radius_km=radius_km)
