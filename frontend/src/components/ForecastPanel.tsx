@@ -207,7 +207,6 @@ export function ForecastPanel({ forecastData, loading, onFetchForecast }: Foreca
                   label: "Historical",
                   color: "#2563eb",
                   showMark: false,
-                  strokeWidth: 2.5,
                 },
                 {
                   data: chartData.predictedValues,
@@ -215,7 +214,6 @@ export function ForecastPanel({ forecastData, loading, onFetchForecast }: Foreca
                   color: "#7c3aed",
                   curve: "linear",
                   showMark: true,
-                  strokeWidth: 3,
                 },
                 {
                   data: chartData.lowerBounds,
@@ -223,7 +221,6 @@ export function ForecastPanel({ forecastData, loading, onFetchForecast }: Foreca
                   color: "#a78bfa",
                   curve: "linear",
                   showMark: false,
-                  strokeWidth: 1.5,
                 },
                 {
                   data: chartData.upperBounds,
@@ -231,7 +228,6 @@ export function ForecastPanel({ forecastData, loading, onFetchForecast }: Foreca
                   color: "#a78bfa",
                   curve: "linear",
                   showMark: false,
-                  strokeWidth: 1.5,
                 },
               ]}
               yAxis={[{ label: metricLabel(forecastData.metric) }]}
