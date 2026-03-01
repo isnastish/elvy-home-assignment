@@ -16,8 +16,8 @@ A full-stack web application for visualizing historical cloud cover and lightnin
 
 | Layer | Technologies |
 |---|---|
-| Frontend | React, TypeScript, Vite, Recharts, Axios |
-| Backend | Python 3.12, FastAPI, httpx, Pydantic, scikit-learn |
+| Frontend | React, TypeScript, Vite, Material-UI (MUI), MUI X Charts, Tailwind CSS, Axios |
+| Backend | Python 3.12, FastAPI, httpx, Pydantic, scikit-learn, uv |
 | Infra | Docker, Docker Compose, Terraform (GCP Cloud Run) |
 | CI/CD | GitHub Actions |
 
@@ -112,28 +112,11 @@ The frontend uses a build-time variable:
 
 ## Deployment
 
-### Quick Setup
-
-For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).
-
-**Quick start:**
-
-```bash
-# 1. Run setup script (automates GCloud configuration)
-./scripts/setup-gcloud.sh your-project-id
-
-# 2. Configure GitHub secrets (see DEPLOYMENT.md for details)
-
-# 3. Deploy with Terraform
-cd terraform
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your values
-terraform init
-terraform apply
-```
-
 ### CI/CD (GitHub Actions)
 
+The application is automatically deployed to Google Cloud Run via GitHub Actions when code is pushed to the `main` branch.
+
+**Workflow:**
 - **CI** (`ci.yml`) — runs on every push/PR to `main`: lints, tests, type-checks, and builds
 - **CD** (`cd.yml`) — runs on push to `main`: builds Docker images, pushes to Artifact Registry, deploys to Cloud Run
 
@@ -146,7 +129,19 @@ terraform apply
    - `WIF_PROVIDER` — Workload Identity Federation provider (full resource name)
    - `WIF_SERVICE_ACCOUNT` — GCP service account email (e.g., `github-actions@PROJECT_ID.iam.gserviceaccount.com`)
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for complete setup instructions.
+**Initial Infrastructure Setup:**
+
+The first deployment requires infrastructure to be created. You can use Terraform:
+
+```bash
+cd terraform
+terraform init
+terraform apply -var="project_id=YOUR_PROJECT_ID" \
+               -var="backend_image=PLACEHOLDER" \
+               -var="frontend_image=PLACEHOLDER"
+```
+
+After initial setup, GitHub Actions will handle all subsequent deployments automatically.
 
 
 ## Data Sources
