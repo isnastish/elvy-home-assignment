@@ -1,261 +1,153 @@
 import { useMemo } from "react";
-import {
-  ComposedChart,
-  Bar,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Brush,
-  ReferenceLine,
-} from "recharts";
+import { BarChart } from "@mui/x-charts/BarChart";
+import { Box, Typography, Paper } from "@mui/material";
 import type { CombinedWeatherResponse } from "../types/weather";
 
 interface WeatherChartProps {
   data: CombinedWeatherResponse;
 }
 
-/** Format period labels: "2024-01" → "Jan 2024", "2024-01-15" → "15 Jan 2024" */
-function formatPeriodLabel(period: string): string {
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const parts = period.split("-");
-  if (parts.length === 3) {
-    return `${parseInt(parts[2])} ${months[parseInt(parts[1]) - 1]} ${parts[0]}`;
-  }
-  if (parts.length === 2) {
-    return `${months[parseInt(parts[1]) - 1]} ${parts[0]}`;
-  }
-  return period; // year only
-}
-
-/** Shortened label for X axis ticks */
-function formatTickLabel(period: string): string {
+function formatPeriod(period: string): string {
   const parts = period.split("-");
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  if (parts.length === 3) {
-    return `${parseInt(parts[2])} ${months[parseInt(parts[1]) - 1]}`;
-  }
-  if (parts.length === 2) {
-    return `${months[parseInt(parts[1]) - 1]} '${parts[0].slice(2)}`;
-  }
+  if (parts.length === 3) return `${parseInt(parts[2])} ${months[parseInt(parts[1]) - 1]}`;
+  if (parts.length === 2) return `${months[parseInt(parts[1]) - 1]} '${parts[0].slice(2)}`;
   return period;
 }
 
-/** Compute a tick interval so we show at most ~MAX_TICKS labels */
-function computeTickInterval(dataLength: number): number | "preserveStartEnd" {
-  const MAX_TICKS = 16;
-  if (dataLength <= MAX_TICKS) return 0; // show all
-  return Math.ceil(dataLength / MAX_TICKS) - 1;
-}
-
-interface ChartDataPoint {
-  period: string;
-  cloud_cover?: number;
-  lightning?: number;
-}
-
-function CustomTooltip({ active, payload, label }: {
-  active?: boolean;
-  payload?: Array<{ dataKey: string; value: number; color: string }>;
-  label?: string;
-}) {
-  if (!active || !payload || !label) return null;
-
-  return (
-    <div className="bg-white rounded-lg border border-gray-200 shadow-lg px-4 py-3 text-sm">
-      <p className="font-semibold text-gray-700 mb-1.5">{formatPeriodLabel(label)}</p>
-      {payload.map((entry) => (
-        <p key={entry.dataKey} className="flex items-center gap-2 py-0.5">
-          <span
-            className="inline-block w-3 h-3 rounded-sm"
-            style={{ backgroundColor: entry.color }}
-          />
-          <span className="text-gray-600">
-            {entry.dataKey === "cloud_cover"
-              ? `Cloud Cover: ${entry.value}%`
-              : `Lightning: ${entry.value}%`}
-          </span>
-        </p>
-      ))}
-    </div>
-  );
+function computeStats(values: number[]) {
+  if (values.length === 0) return null;
+  return {
+    avg: Number((values.reduce((a, b) => a + b, 0) / values.length).toFixed(1)),
+    max: Math.max(...values),
+    total: values.reduce((a, b) => a + b, 0),
+  };
 }
 
 export function WeatherChart({ data }: WeatherChartProps) {
-  const chartData = useMemo(() => {
-    const periodMap = new Map<string, ChartDataPoint>();
+  const cloudData = useMemo(
+    () => data.cloud_cover.map((p) => ({ period: p.period, value: p.value })).sort((a, b) => a.period.localeCompare(b.period)),
+    [data.cloud_cover],
+  );
 
-    for (const point of data.cloud_cover) {
-      periodMap.set(point.period, {
-        ...periodMap.get(point.period),
-        period: point.period,
-        cloud_cover: point.value,
-      });
-    }
+  const lightningData = useMemo(
+    () => data.lightning.map((p) => ({ period: p.period, value: p.value })).sort((a, b) => a.period.localeCompare(b.period)),
+    [data.lightning],
+  );
 
-    for (const point of data.lightning) {
-      periodMap.set(point.period, {
-        ...periodMap.get(point.period),
-        period: point.period,
-        lightning: point.value,
-      });
-    }
+  const cloudStats = useMemo(() => computeStats(cloudData.map((d) => d.value)), [cloudData]);
+  const lightningStats = useMemo(() => computeStats(lightningData.map((d) => d.value)), [lightningData]);
 
-    return Array.from(periodMap.values()).sort((a, b) =>
-      a.period.localeCompare(b.period)
-    );
-  }, [data]);
-
-  const stats = useMemo(() => {
-    const cloudValues = chartData.map((d) => d.cloud_cover).filter((v): v is number => v != null);
-    const lightningValues = chartData.map((d) => d.lightning).filter((v): v is number => v != null);
-
-    return {
-      cloudAvg: cloudValues.length > 0 ? +(cloudValues.reduce((a, b) => a + b, 0) / cloudValues.length).toFixed(1) : null,
-      cloudMin: cloudValues.length > 0 ? Math.min(...cloudValues) : null,
-      cloudMax: cloudValues.length > 0 ? Math.max(...cloudValues) : null,
-      lightningAvg: lightningValues.length > 0 ? +(lightningValues.reduce((a, b) => a + b, 0) / lightningValues.length).toFixed(1) : null,
-      lightningMax: lightningValues.length > 0 ? Math.max(...lightningValues) : null,
-      totalPoints: chartData.length,
-      dateRange: chartData.length > 0 ? `${formatPeriodLabel(chartData[0].period)} – ${formatPeriodLabel(chartData[chartData.length - 1].period)}` : "",
-    };
-  }, [chartData]);
-
-  if (chartData.length === 0) {
+  if (cloudData.length === 0 && lightningData.length === 0) {
     return (
-      <div className="text-center py-10 text-gray-400 text-base">
-        No data available for this location and granularity.
-      </div>
+      <Box sx={{ textAlign: "center", py: 5, color: "text.secondary" }}>
+        <Typography>No data available for this location and granularity.</Typography>
+      </Box>
     );
   }
 
-  const showBrush = chartData.length > 36;
-  const tickInterval = computeTickInterval(chartData.length);
-
   return (
-    <div>
-      <div className="mb-3 text-sm text-gray-500 text-center">
-        Station: <strong>{data.station_name}</strong> (ID: {data.station_id}) —{" "}
-        {data.latitude.toFixed(4)}°N, {data.longitude.toFixed(4)}°E
-      </div>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <Box sx={{ textAlign: "center", color: "text.secondary", fontSize: "0.875rem" }}>
+        <Typography variant="body2">
+          Station: <strong>{data.station_name}</strong> (ID: {data.station_id}) — {data.latitude.toFixed(4)}°N, {data.longitude.toFixed(4)}°E
+        </Typography>
+      </Box>
 
-      {/* Summary stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-        {stats.cloudAvg != null && (
-          <div className="bg-blue-50 rounded-lg px-4 py-3 text-center">
-            <div className="text-xs text-blue-400 uppercase tracking-wide font-medium">Avg Cloud Cover</div>
-            <div className="text-xl font-bold text-blue-600 mt-1">{stats.cloudAvg}<span className="text-sm font-normal">%</span></div>
-          </div>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, 1fr)" }, gap: 2 }}>
+        {cloudStats && (
+          <>
+            <Paper sx={{ p: 2, textAlign: "center", bgcolor: "primary.50" }}>
+              <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 500, textTransform: "uppercase" }}>
+                Avg Cloud Cover
+              </Typography>
+              <Typography variant="h6" sx={{ color: "primary.main", fontWeight: 700, mt: 0.5 }}>
+                {cloudStats.avg}%
+              </Typography>
+            </Paper>
+            <Paper sx={{ p: 2, textAlign: "center", bgcolor: "primary.50" }}>
+              <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 500, textTransform: "uppercase" }}>
+                Max Cloud Cover
+              </Typography>
+              <Typography variant="h6" sx={{ color: "primary.main", fontWeight: 700, mt: 0.5 }}>
+                {cloudStats.max}%
+              </Typography>
+            </Paper>
+          </>
         )}
-        {stats.cloudMax != null && (
-          <div className="bg-blue-50 rounded-lg px-4 py-3 text-center">
-            <div className="text-xs text-blue-400 uppercase tracking-wide font-medium">Max Cloud Cover</div>
-            <div className="text-xl font-bold text-blue-600 mt-1">{stats.cloudMax}<span className="text-sm font-normal">%</span></div>
-          </div>
+        {lightningStats && (
+          <>
+            <Paper sx={{ p: 2, textAlign: "center", bgcolor: "warning.50" }}>
+              <Typography variant="caption" sx={{ color: "warning.main", fontWeight: 500, textTransform: "uppercase" }}>
+                Total Strikes
+              </Typography>
+              <Typography variant="h6" sx={{ color: "warning.main", fontWeight: 700, mt: 0.5 }}>
+                {lightningStats.total.toLocaleString()}
+              </Typography>
+            </Paper>
+            <Paper sx={{ p: 2, textAlign: "center", bgcolor: "warning.50" }}>
+              <Typography variant="caption" sx={{ color: "warning.main", fontWeight: 500, textTransform: "uppercase" }}>
+                Peak Strikes
+              </Typography>
+              <Typography variant="h6" sx={{ color: "warning.main", fontWeight: 700, mt: 0.5 }}>
+                {lightningStats.max.toLocaleString()}
+              </Typography>
+            </Paper>
+          </>
         )}
-        {stats.lightningAvg != null && (
-          <div className="bg-amber-50 rounded-lg px-4 py-3 text-center">
-            <div className="text-xs text-amber-500 uppercase tracking-wide font-medium">Avg Lightning</div>
-            <div className="text-xl font-bold text-amber-600 mt-1">{stats.lightningAvg}<span className="text-sm font-normal">%</span></div>
-          </div>
-        )}
-        {stats.lightningMax != null && (
-          <div className="bg-amber-50 rounded-lg px-4 py-3 text-center">
-            <div className="text-xs text-amber-500 uppercase tracking-wide font-medium">Peak Lightning</div>
-            <div className="text-xl font-bold text-amber-600 mt-1">{stats.lightningMax}<span className="text-sm font-normal">%</span></div>
-          </div>
-        )}
-      </div>
+      </Box>
 
-      <div className="text-xs text-gray-400 text-center mb-1">
-        {stats.dateRange} — {stats.totalPoints} data points
-        {showBrush && <span className="ml-1">(drag below chart to zoom)</span>}
-      </div>
+      {cloudData.length > 0 && (
+        <Paper sx={{ p: 3 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+            Cloud Cover (%)
+          </Typography>
+          <BarChart
+            xAxis={[
+              {
+                scaleType: "band",
+                data: cloudData.map((d) => formatPeriod(d.period)),
+                label: "Period",
+              },
+            ]}
+            series={[
+              {
+                data: cloudData.map((d) => d.value),
+                color: "#64b5f6",
+              },
+            ]}
+            yAxis={[{ label: "Cloud Cover (%)" }]}
+            height={300}
+            margin={{ top: 20, right: 20, bottom: 60, left: 60 }}
+          />
+        </Paper>
+      )}
 
-      <ResponsiveContainer width="100%" height={showBrush ? 450 : 400}>
-        <ComposedChart
-          data={chartData}
-          margin={{ top: 20, right: 30, left: 20, bottom: showBrush ? 10 : 60 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis
-            dataKey="period"
-            angle={-45}
-            textAnchor="end"
-            height={80}
-            interval={tickInterval}
-            tick={{ fontSize: 11 }}
-            tickFormatter={formatTickLabel}
+      {lightningData.length > 0 && (
+        <Paper sx={{ p: 3 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+            Lightning Strikes
+          </Typography>
+          <BarChart
+            xAxis={[
+              {
+                scaleType: "band",
+                data: lightningData.map((d) => formatPeriod(d.period)),
+                label: "Period",
+              },
+            ]}
+            series={[
+              {
+                data: lightningData.map((d) => d.value),
+                color: "#fbbf24",
+              },
+            ]}
+            yAxis={[{ label: "Strikes" }]}
+            height={300}
+            margin={{ top: 20, right: 20, bottom: 60, left: 60 }}
           />
-          <YAxis
-            yAxisId="left"
-            domain={[0, 100]}
-            label={{
-              value: "Cloud Cover (%)",
-              angle: -90,
-              position: "insideLeft",
-              style: { fontSize: 12 },
-            }}
-          />
-          <YAxis
-            yAxisId="right"
-            orientation="right"
-            domain={[0, "auto"]}
-            label={{
-              value: "Lightning Prob. (%)",
-              angle: 90,
-              position: "insideRight",
-              style: { fontSize: 12 },
-            }}
-          />
-          <Tooltip content={<CustomTooltip />} />
-          <Legend wrapperStyle={{ paddingTop: 16 }} />
-
-          {/* Average reference lines */}
-          {stats.cloudAvg != null && (
-            <ReferenceLine
-              yAxisId="left"
-              y={stats.cloudAvg}
-              stroke="#3b82f6"
-              strokeDasharray="4 4"
-              strokeOpacity={0.5}
-              label={{ value: `avg ${stats.cloudAvg}%`, position: "left", fontSize: 10, fill: "#3b82f6" }}
-            />
-          )}
-
-          <Bar
-            yAxisId="left"
-            dataKey="cloud_cover"
-            name="Cloud Cover (%)"
-            fill="#64b5f6"
-            radius={[4, 4, 0, 0]}
-            opacity={0.8}
-          />
-          <Line
-            yAxisId="right"
-            type="monotone"
-            dataKey="lightning"
-            name="Lightning Probability (%)"
-            stroke="#ffa726"
-            strokeWidth={2}
-            dot={{ r: 2 }}
-            activeDot={{ r: 5 }}
-          />
-
-          {showBrush && (
-            <Brush
-              dataKey="period"
-              height={30}
-              stroke="#94a3b8"
-              tickFormatter={formatTickLabel}
-              startIndex={Math.max(0, chartData.length - 36)}
-            />
-          )}
-        </ComposedChart>
-      </ResponsiveContainer>
-    </div>
+        </Paper>
+      )}
+    </Box>
   );
 }

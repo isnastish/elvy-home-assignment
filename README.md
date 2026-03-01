@@ -1,12 +1,12 @@
 # SMHI Weather Analytics
 
-A full-stack web application for visualizing historical cloud cover and lightning probability data for Swedish locations, powered by [SMHI Open Data](https://opendata.smhi.se).
+A full-stack web application for visualizing historical cloud cover and lightning strike data for Swedish locations, powered by [SMHI Open Data](https://opendata.smhi.se).
 
 ## Features
 
 - **Address search** — enter any Swedish address or city, geocoded via OpenStreetMap/Nominatim
 - **Cloud cover visualization** — historical cloud cover data (percentage, 0–100%) from the nearest SMHI station
-- **Lightning probability** — thunder day observations converted to strike probability percentages
+- **Lightning strikes** — actual lightning strike counts from the SMHI Lightning Archive API, filtered by proximity to the selected location
 - **Granularity toggle** — view data aggregated by day, month, or year
 - **AI forecasting** — Ridge regression model with seasonal decomposition predicts future values with 95% confidence intervals
 - **Terraform deployment** — infrastructure-as-code for Google Cloud Run
@@ -72,8 +72,8 @@ All endpoints are prefixed with `/api/v1`.
 | `GET` | `/api/v1/locations/geocode?address=...` | Geocode an address to lat/lon |
 | `GET` | `/api/v1/locations/stations?lat=...&lon=...` | Find nearest SMHI stations |
 | `GET` | `/api/v1/weather/cloud-cover?lat=...&lon=...&granularity=month` | Cloud cover data |
-| `GET` | `/api/v1/weather/lightning?lat=...&lon=...&granularity=month` | Lightning probability |
-| `GET` | `/api/v1/weather/combined?lat=...&lon=...&granularity=month` | Both cloud cover and lightning |
+| `GET` | `/api/v1/weather/lightning?lat=...&lon=...&granularity=month&radius_km=50` | Lightning strike counts |
+| `GET` | `/api/v1/weather/combined?lat=...&lon=...&granularity=month&radius_km=50` | Both cloud cover and lightning |
 | `GET` | `/api/v1/forecast?lat=...&lon=...&metric=cloud_cover&months_ahead=12` | AI forecast |
 
 Granularity options: `day`, `month`, `year`.
@@ -102,6 +102,7 @@ The backend is configured via environment variables (with sensible defaults):
 |---|---|---|
 | `CORS_ORIGINS` | `["http://localhost:3000", "http://localhost:5173"]` | Allowed CORS origins |
 | `SMHI_CACHE_TTL_HOURS` | `6` | How long to cache SMHI API responses |
+| `LIGHTNING_SEARCH_RADIUS_KM` | `50` | Radius (km) for lightning strike proximity search |
 
 The frontend uses a build-time variable:
 
@@ -135,7 +136,6 @@ Required GitHub secrets/variables:
 
 ## Data Sources
 
-- **Weather data**: [SMHI Open Data — Meteorological Observations API](https://opendata.smhi.se/apidocs/metobs/)
-  - Parameter 16: Total cloud cover (percent, 0–100%)
-  - Parameter 30: Number of days with thunder (monthly)
+- **Cloud cover**: [SMHI Metobs API](https://opendata.smhi.se/apidocs/metobs/) — Parameter 16: Total cloud cover (percent, 0–100%)
+- **Lightning strikes**: [SMHI Lightning Archive API](https://opendata-download-lightning.smhi.se/api/) — individual strike records with lat/lon, filtered by proximity
 - **Geocoding**: [Nominatim (OpenStreetMap)](https://nominatim.openstreetmap.org/)
