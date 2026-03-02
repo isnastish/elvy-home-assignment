@@ -1,5 +1,3 @@
-"""Shared geospatial utilities."""
-
 import math
 
 

@@ -1,5 +1,3 @@
-"""Routes for geocoding and station discovery."""
-
 import logging
 from typing import Annotated
 

@@ -1,5 +1,3 @@
-"""Routes for weather data (cloud cover and lightning strikes)."""
-
 import logging
 from typing import Annotated
 

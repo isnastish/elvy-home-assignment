@@ -27,14 +27,7 @@ from src.settings import settings
 
 _logger = logging.getLogger(__name__)
 
-
-def _bounding_box(lat: float, lon: float, radius_km: float) -> tuple[float, float, float, float]:
-    """Return (min_lat, max_lat, min_lon, max_lon) for a quick pre-filter."""
-    # ~111 km per degree of latitude
-    dlat = radius_km / 111.0
-    # longitude degrees shrink with cos(latitude)
-    dlon = radius_km / (111.0 * max(math.cos(math.radians(lat)), 0.01))
-    return (lat - dlat, lat + dlat, lon - dlon, lon + dlon)
+_KM_PER_DEGREE_LAT = 111.0  # approximate km per degree of latitude
 
 
 class LightningClient:
@@ -66,7 +59,8 @@ class LightningClient:
     async def _fetch_json(self, client: httpx.AsyncClient, url: str) -> Any | None:
         """Fetch JSON with semaphore-throttled concurrency.
 
-        Returns None on 404 (expected for days with no lightning data).
+        Returns ``None`` on 404 (expected for days with no lightning data)
+        or on any network / HTTP error.
         """
         async with self._semaphore:
             try:
@@ -76,14 +70,19 @@ class LightningClient:
                 resp.raise_for_status()
                 return resp.json()
             except httpx.HTTPError as e:
-                status_code = getattr(e, "response", None)
-                if status_code and hasattr(status_code, "status_code") and status_code.status_code == 404:
-                    return None
                 _logger.warning(f"Lightning API request failed: {url} – {e}")
                 return None
             except Exception as e:
                 _logger.error(f"Unexpected error fetching {url}: {e}", exc_info=True)
                 return None
+
+    @staticmethod
+    def _bounding_box(lat: float, lon: float, radius_km: float) -> tuple[float, float, float, float]:
+        """Return (min_lat, max_lat, min_lon, max_lon) for a quick bbox pre-filter."""
+        dlat = radius_km / _KM_PER_DEGREE_LAT
+        # Longitude degrees shrink with cos(latitude)
+        dlon = radius_km / (_KM_PER_DEGREE_LAT * max(math.cos(math.radians(lat)), 0.01))
+        return (lat - dlat, lat + dlat, lon - dlon, lon + dlon)
 
     async def _count_day_strikes(
         self,
@@ -162,9 +161,9 @@ class LightningClient:
                 except (ValueError, TypeError):
                     continue
                 # Skip months outside the requested range
-                month_start = date(year, month, 1)
-                month_end = date(year, month + 1, 1) - timedelta(days=1) if month < 12 else date(year, 12, 31)
-                if month_end < start_date or month_start > end_date:
+                first_of_month = date(year, month, 1)
+                last_of_month = date(year + (month // 12), (month % 12) + 1, 1) - timedelta(days=1)
+                if last_of_month < start_date or first_of_month > end_date:
                     continue
                 months_to_check.append((year, month))
 
@@ -214,7 +213,7 @@ class LightningClient:
         raw strike data is filtered and discarded immediately to keep memory
         usage constant regardless of how many days are fetched.
         """
-        bbox = _bounding_box(lat, lon, radius_km)
+        bbox = self._bounding_box(lat, lon, radius_km)
 
         daily_counts: dict[date, int] = {}
         async with httpx.AsyncClient(timeout=30.0) as client:
