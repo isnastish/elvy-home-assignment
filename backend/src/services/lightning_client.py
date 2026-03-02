@@ -93,18 +93,23 @@ class LightningClient:
                 _logger.error(f"Unexpected error fetching {url}: {e}", exc_info=True)
                 return None
 
-    async def _fetch_day_strikes(
+    async def _count_day_strikes(
         self,
         client: httpx.AsyncClient,
         year: int,
         month: int,
         day: int,
-    ) -> list[dict]:
-        """Fetch all strikes for a single day (cached).
-        
-        Returns empty list on 404 (day has no lightning data).
+        lat: float,
+        lon: float,
+        radius_km: float,
+        bbox: tuple[float, float, float, float],
+    ) -> int:
+        """Fetch strikes for a single day and return the count near (lat, lon).
+
+        Filters by location immediately so raw strike data is never held in
+        memory across tasks.  Returns 0 if no nearby strikes or on error.
         """
-        cache_key = f"lightning:data:{year}:{month}:{day}"
+        cache_key = f"lightning:count:{year}:{month}:{day}:{lat}:{lon}:{radius_km}"
         cached = self._get_cached(cache_key)
         if cached is not None:
             return cached
@@ -112,8 +117,25 @@ class LightningClient:
         url = f"{settings.smhi.lightning_base_url}/version/latest/year/{year}/month/{month}/day/{day}/data.json"
         data = await self._fetch_json(client, url)
         strikes = data.get("values", []) if data else []
-        self._set_cached(cache_key, strikes)
-        return strikes
+
+        if not strikes:
+            self._set_cached(cache_key, 0)
+            return 0
+
+        min_lat, max_lat, min_lon, max_lon = bbox
+        count = 0
+        for strike in strikes:
+            s_lat = strike.get("lat")
+            s_lon = strike.get("lon")
+            if s_lat is None or s_lon is None:
+                continue
+            if not (min_lat <= s_lat <= max_lat and min_lon <= s_lon <= max_lon):
+                continue
+            if _haversine_km(lat, lon, s_lat, s_lon) <= radius_km:
+                count += 1
+
+        self._set_cached(cache_key, count)
+        return count
 
     async def _discover_available_days(
         self,
@@ -201,9 +223,11 @@ class LightningClient:
         Only dates with ≥1 strike are included.
 
         Uses the API hierarchy to discover which days actually have data before
-        fetching, avoiding hundreds of unnecessary 404 requests.
+        fetching, avoiding hundreds of unnecessary 404 requests.  Each day's
+        raw strike data is filtered and discarded immediately to keep memory
+        usage constant regardless of how many days are fetched.
         """
-        min_lat, max_lat, min_lon, max_lon = _bounding_box(lat, lon, radius_km)
+        bbox = _bounding_box(lat, lon, radius_km)
 
         daily_counts: dict[date, int] = {}
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -215,47 +239,19 @@ class LightningClient:
                 f"({start_date} → {end_date}) for ({lat}, {lon}), radius={radius_km}km"
             )
 
-            # Fetch strike data only for days that exist
-            tasks = [self._fetch_day_strikes(client, y, m, d) for y, m, d in days_to_fetch]
+            # Fetch and count strikes per day — raw data is discarded inside each task
+            tasks = [
+                self._count_day_strikes(client, y, m, d, lat, lon, radius_km, bbox)
+                for y, m, d in days_to_fetch
+            ]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for (y, m, d), result in zip(days_to_fetch, results):
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 _logger.warning(f"Exception fetching strikes for {y}-{m:02d}-{d:02d}: {result}")
                 continue
-
-            if not isinstance(result, list):
-                _logger.error(
-                    f"Unexpected result type for {y}-{m:02d}-{d:02d}: expected list, got {type(result).__name__}. "
-                    f"Result: {result}"
-                )
-                continue
-
-            if not result:
-                continue
-
-            # Fast bounding-box pre-filter, then precise haversine
-            count = 0
-            invalid_strikes = 0
-            for strike in result:
-                s_lat = strike.get("lat")
-                s_lon = strike.get("lon")
-                if s_lat is None or s_lon is None:
-                    invalid_strikes += 1
-                    continue
-                if not (min_lat <= s_lat <= max_lat and min_lon <= s_lon <= max_lon):
-                    continue
-                if _haversine_km(lat, lon, s_lat, s_lon) <= radius_km:
-                    count += 1
-
-            if invalid_strikes > 0:
-                _logger.warning(
-                    f"Found {invalid_strikes} strikes with missing lat/lon for {y}-{m:02d}-{d:02d} "
-                    f"(out of {len(result)} total strikes)"
-                )
-
-            if count > 0:
-                daily_counts[date(y, m, d)] = count
+            if result > 0:
+                daily_counts[date(y, m, d)] = result
 
         _logger.info(f"Found {sum(daily_counts.values())} strikes across {len(daily_counts)} days near ({lat}, {lon})")
         return daily_counts
