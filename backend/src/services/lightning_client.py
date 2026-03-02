@@ -115,6 +115,78 @@ class LightningClient:
         self._set_cached(cache_key, strikes)
         return strikes
 
+    async def _discover_available_days(
+        self,
+        client: httpx.AsyncClient,
+        start_date: date,
+        end_date: date,
+    ) -> list[tuple[int, int, int]]:
+        """Use the API hierarchy to discover only the days that have data.
+
+        Instead of blindly requesting every day in the range (~1095 for 3 years),
+        we first ask which months and days actually exist. Lightning in Sweden is
+        seasonal (mostly May–Sep), so this typically reduces requests by 70-80%.
+        """
+        base = settings.smhi.lightning_base_url
+
+        # 1. Fetch available months for each year in the range
+        years = range(start_date.year, end_date.year + 1)
+        year_tasks = [
+            self._fetch_json(client, f"{base}/version/latest/year/{y}.json")
+            for y in years
+        ]
+        year_results = await asyncio.gather(*year_tasks, return_exceptions=True)
+
+        # 2. Collect (year, month) pairs that fall within our date range
+        months_to_check: list[tuple[int, int]] = []
+        for year, result in zip(years, year_results):
+            if isinstance(result, BaseException) or result is None:
+                continue
+            for resource in result.get("month", []):
+                key = resource.get("key")
+                if key is None:
+                    continue
+                try:
+                    month = int(key)
+                except (ValueError, TypeError):
+                    continue
+                # Skip months outside the requested range
+                month_start = date(year, month, 1)
+                month_end = date(
+                    year, month + 1, 1) - timedelta(days=1) if month < 12 else date(year, 12, 31)
+                if month_end < start_date or month_start > end_date:
+                    continue
+                months_to_check.append((year, month))
+
+        _logger.info(f"Lightning API: {len(months_to_check)} months with data in range {start_date} → {end_date}")
+
+        # 3. Fetch available days for each month
+        month_tasks = [
+            self._fetch_json(client, f"{base}/version/latest/year/{y}/month/{m}.json")
+            for y, m in months_to_check
+        ]
+        month_results = await asyncio.gather(*month_tasks, return_exceptions=True)
+
+        # 4. Collect (year, month, day) tuples that fall within our date range
+        days_to_fetch: list[tuple[int, int, int]] = []
+        for (year, month), result in zip(months_to_check, month_results):
+            if isinstance(result, BaseException) or result is None:
+                continue
+            for resource in result.get("day", []):
+                key = resource.get("key")
+                if key is None:
+                    continue
+                try:
+                    day = int(key)
+                except (ValueError, TypeError):
+                    continue
+                d = date(year, month, day)
+                if start_date <= d <= end_date:
+                    days_to_fetch.append((year, month, day))
+
+        _logger.info(f"Lightning API: {len(days_to_fetch)} days with data to fetch")
+        return days_to_fetch
+
     async def get_strikes_in_range(
         self,
         lat: float,
@@ -127,28 +199,23 @@ class LightningClient:
 
         Returns a dict mapping ``date`` → strike count.
         Only dates with ≥1 strike are included.
-        
-        Optimized to fetch all days directly without checking available days first,
-        reducing API calls by ~50%. 404s are handled gracefully.
+
+        Uses the API hierarchy to discover which days actually have data before
+        fetching, avoiding hundreds of unnecessary 404 requests.
         """
         min_lat, max_lat, min_lon, max_lon = _bounding_box(lat, lon, radius_km)
 
-        # Build list of all days in range - fetch directly, handle 404s
-        days_to_fetch: list[tuple[int, int, int]] = []
-        current = start_date
-        while current <= end_date:
-            days_to_fetch.append((current.year, current.month, current.day))
-            current += timedelta(days=1)
-
-        total_days = len(days_to_fetch)
-        _logger.info(
-            f"Fetching {total_days} days of lightning data "
-            f"({start_date} → {end_date}) for ({lat}, {lon}), radius={radius_km}km"
-        )
-
-        # Fetch all days concurrently (throttled by semaphore, 404s handled gracefully)
         daily_counts: dict[date, int] = {}
         async with httpx.AsyncClient(timeout=30.0) as client:
+            # Discover only days that have data via the API hierarchy
+            days_to_fetch = await self._discover_available_days(client, start_date, end_date)
+
+            _logger.info(
+                f"Fetching {len(days_to_fetch)} days of lightning data "
+                f"({start_date} → {end_date}) for ({lat}, {lon}), radius={radius_km}km"
+            )
+
+            # Fetch strike data only for days that exist
             tasks = [self._fetch_day_strikes(client, y, m, d) for y, m, d in days_to_fetch]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -156,14 +223,14 @@ class LightningClient:
             if isinstance(result, Exception):
                 _logger.warning(f"Exception fetching strikes for {y}-{m:02d}-{d:02d}: {result}")
                 continue
-            
+
             if not isinstance(result, list):
                 _logger.error(
                     f"Unexpected result type for {y}-{m:02d}-{d:02d}: expected list, got {type(result).__name__}. "
                     f"Result: {result}"
                 )
                 continue
-            
+
             if not result:
                 continue
 
