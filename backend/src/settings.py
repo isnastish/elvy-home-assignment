@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any, Tuple, Type
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import (
@@ -14,7 +14,7 @@ from pydantic_settings import (
 class CustomYamlConfigSettingsSource(YamlConfigSettingsSource):
     """Custom YAML settings source that loads from settings.yaml."""
 
-    def __init__(self, settings_cls: Type[BaseSettings]) -> None:
+    def __init__(self, settings_cls: type[BaseSettings]) -> None:
         yaml_file = Path(__file__).parent.parent / "settings.yaml"
         super().__init__(settings_cls, yaml_file=yaml_file)
 
@@ -31,12 +31,12 @@ class YamlSettings(BaseSettings):
     @classmethod
     def settings_customise_sources(
         cls,
-        settings_cls: Type[BaseSettings],
+        settings_cls: type[BaseSettings],
         init_settings: PydanticBaseSettingsSource,
         env_settings: PydanticBaseSettingsSource,
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
-    ) -> Tuple[PydanticBaseSettingsSource, ...]:
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
         """Customize settings sources: init -> env -> YAML."""
         return (
             init_settings,

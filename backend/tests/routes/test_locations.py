@@ -33,17 +33,19 @@ async def test_geocode_address(client: TestClient, mock_geocoding_service: Async
 @pytest.mark.asyncio
 async def test_get_nearest_stations(client: TestClient, mock_smhi_service: AsyncMock) -> None:
     """Test finding nearest stations."""
+    best_station = Station(
+        id=98210,
+        name="Stockholm-Observatoriekullen",
+        latitude=59.3419,
+        longitude=18.0546,
+        distance_km=1.2,
+        active=True,
+    )
     mock_smhi_service.find_nearest_stations.return_value = [
-        Station(
-            id=98210,
-            name="Stockholm-Observatoriekullen",
-            latitude=59.3419,
-            longitude=18.0546,
-            distance_km=1.2,
-            active=True,
-        ),
+        best_station,
         Station(id=98230, name="Stockholm-Bromma", latitude=59.3536, longitude=17.9514, distance_km=5.3, active=True),
     ]
+    mock_smhi_service.find_best_station.return_value = best_station
 
     response = client.get("/locations/stations", params={"lat": 59.33, "lon": 18.07})
 

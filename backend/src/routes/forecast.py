@@ -1,5 +1,3 @@
-"""Routes for AI-based weather forecasting (bonus feature)."""
-
 import logging
 from typing import Annotated
 

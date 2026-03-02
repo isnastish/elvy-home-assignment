@@ -1,28 +1,25 @@
 """Raw SMHI Open Data API client with in-memory caching."""
 
 import logging
-import math
 from datetime import datetime, timedelta
 from typing import Any
 
 import httpx
 
+from src.exceptions.errors import SmhiApiError
 from src.models.location import Station
+from src.services.geo_utils import haversine_km
 from src.settings import settings
 
 _logger = logging.getLogger(__name__)
 
-# SMHI Metobs parameter IDs - loaded from settings
-PARAM_CLOUD_COVER = settings.smhi.parameters.cloud_cover  # Total cloud cover (mean, percent 0–100)
+PARAM_CLOUD_COVER = settings.smhi.parameters.cloud_cover  # Total cloud cover (percent 0–100)
 
+_STATION_LIST_TIMEOUT = 30.0  # seconds — station metadata is small
+_STATION_DATA_TIMEOUT = 60.0  # seconds — historical data can be large
 
-def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Calculate distance in km between two lat/lon points."""
-    R = 6371.0
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
-    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+# SMHI serves historical observations in two periods; we fetch both and merge.
+_DATA_PERIODS = ("corrected-archive", "latest-months")
 
 
 class SmhiClient:
@@ -31,6 +28,7 @@ class SmhiClient:
     def __init__(self) -> None:
         self._cache: dict[str, tuple[datetime, Any]] = {}
         self._ttl = timedelta(hours=settings.smhi.cache_ttl_hours)
+        # Station metadata rarely changes — cached permanently for the process lifetime.
         self._stations_cache: dict[int, list[Station]] = {}
 
     def _get_cached(self, key: str) -> Any | None:
@@ -45,17 +43,23 @@ class SmhiClient:
         self._cache[key] = (datetime.now(), data)
 
     async def get_stations(self, parameter: int) -> list[Station]:
-        """Get all stations for a given parameter."""
+        """Get all stations for a given parameter.
+
+        Results are cached permanently (station metadata rarely changes).
+        """
         if parameter in self._stations_cache:
             return self._stations_cache[parameter]
 
         url = f"{settings.smhi.base_url}/version/latest/parameter/{parameter}.json"
         _logger.info(f"Fetching stations for parameter {parameter} from {url}")
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            data = response.json()
+        try:
+            async with httpx.AsyncClient(timeout=_STATION_LIST_TIMEOUT) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                data = response.json()
+        except httpx.HTTPError as e:
+            raise SmhiApiError(f"Failed to fetch stations for parameter {parameter}: {e}") from e
 
         stations: list[Station] = []
         for s in data.get("station", []):
@@ -77,19 +81,17 @@ class SmhiClient:
         """Find the nearest stations for a parameter, sorted by distance."""
         all_stations = await self.get_stations(parameter)
 
-        stations_with_distance = []
-        for s in all_stations:
-            dist = _haversine_km(lat, lon, s.latitude, s.longitude)
-            stations_with_distance.append(
-                Station(
-                    id=s.id,
-                    name=s.name,
-                    latitude=s.latitude,
-                    longitude=s.longitude,
-                    distance_km=round(dist, 2),
-                    active=s.active,
-                )
+        stations_with_distance = [
+            Station(
+                id=s.id,
+                name=s.name,
+                latitude=s.latitude,
+                longitude=s.longitude,
+                distance_km=round(haversine_km(lat, lon, s.latitude, s.longitude), 2),
+                active=s.active,
             )
+            for s in all_stations
+        ]
 
         stations_with_distance.sort(key=lambda s: s.distance_km)
         return stations_with_distance[:limit]
@@ -97,19 +99,18 @@ class SmhiClient:
     async def get_station_data(self, parameter: int, station_id: int) -> dict:
         """Get historical data for a station and parameter.
 
-        Tries corrected-archive first, falls back to latest-months.
+        Fetches both *corrected-archive* (bulk historical) and *latest-months*
+        (recent data), then deduplicates by timestamp.
         """
         cache_key = f"data:{parameter}:{station_id}"
         cached = self._get_cached(cache_key)
         if cached is not None:
             return cached
 
-        # Try corrected-archive first (most complete historical data)
-        periods = ["corrected-archive", "latest-months"]
         all_values: list[dict] = []
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            for period in periods:
+        async with httpx.AsyncClient(timeout=_STATION_DATA_TIMEOUT) as client:
+            for period in _DATA_PERIODS:
                 url = (
                     f"{settings.smhi.base_url}/version/latest"
                     f"/parameter/{parameter}"
@@ -124,13 +125,12 @@ class SmhiClient:
                         continue
                     response.raise_for_status()
                     data = response.json()
-                    values = data.get("value", [])
-                    all_values.extend(values)
+                    all_values.extend(data.get("value", []))
                 except httpx.HTTPError as e:
-                    _logger.warning(f"Failed to fetch {period} data: {e}")
+                    _logger.warning(f"Failed to fetch {period} data for station {station_id}: {e}")
                     continue
 
-        # Deduplicate by timestamp (prefer later entries)
+        # Deduplicate by timestamp — later entries (latest-months) win over archive
         seen_timestamps: dict[int, dict] = {}
         for v in all_values:
             ts = v.get("date", 0)

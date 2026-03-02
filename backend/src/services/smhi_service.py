@@ -18,6 +18,7 @@ import logging
 from collections import defaultdict
 from datetime import date, datetime, timezone
 
+from src.exceptions.errors import StationNotFoundError
 from src.models.location import Station
 from src.models.weather import (
     CloudCoverResponse,
@@ -40,10 +41,6 @@ class SmhiService:
         self._client = client
         self._lightning_client = lightning_client
 
-    # ------------------------------------------------------------------ #
-    # Helpers
-    # ------------------------------------------------------------------ #
-
     @staticmethod
     def _timestamp_to_datetime(ts_ms: int) -> datetime:
         """Convert SMHI millisecond timestamp to datetime."""
@@ -64,14 +61,27 @@ class SmhiService:
     def _aggregate_values(
         raw_values: list[dict],
         granularity: Granularity,
+        max_years: int | None = None,
     ) -> list[WeatherDataPoint]:
-        """Aggregate raw SMHI values by the given granularity."""
+        """Aggregate raw SMHI values by the given granularity.
+
+        If *max_years* is provided, only data points from the last N years
+        are included (useful for keeping the chart consistent with lightning data).
+        """
+        cutoff_ts: float | None = None
+        if max_years is not None:
+            now = datetime.now(tz=timezone.utc)
+            cutoff = now.replace(year=now.year - max_years)
+            cutoff_ts = cutoff.timestamp() * 1000  # SMHI uses ms timestamps
+
         buckets: dict[str, list[float]] = defaultdict(list)
 
         for entry in raw_values:
             ts = entry.get("date")
             val = entry.get("value")
             if ts is None or val is None:
+                continue
+            if cutoff_ts is not None and ts < cutoff_ts:
                 continue
             try:
                 value = float(val)
@@ -111,10 +121,6 @@ class SmhiService:
 
         return [WeatherDataPoint(period=period, value=float(total)) for period, total in sorted(buckets.items())]
 
-    # ------------------------------------------------------------------ #
-    # Station lookup
-    # ------------------------------------------------------------------ #
-
     async def _find_best_station(self, parameter: int, lat: float, lon: float) -> Station:
         """Find the nearest active station for a parameter."""
         stations = await self._client.find_nearest_stations(parameter, lat, lon, limit=10)
@@ -126,18 +132,20 @@ class SmhiService:
         if stations:
             return stations[0]
 
-        raise ValueError(f"No stations found for parameter {parameter} near ({lat}, {lon})")
+        raise StationNotFoundError(lat, lon)
 
-    # ------------------------------------------------------------------ #
-    # Public API
-    # ------------------------------------------------------------------ #
+    async def find_best_station(self, lat: float, lon: float) -> Station:
+        """Find the nearest active cloud-cover station for a location."""
+        return await self._find_best_station(PARAM_CLOUD_COVER, lat, lon)
 
     async def get_cloud_cover(self, lat: float, lon: float, granularity: Granularity) -> CloudCoverResponse:
         """Get aggregated cloud cover data for a location."""
         station = await self._find_best_station(PARAM_CLOUD_COVER, lat, lon)
         raw_data = await self._client.get_station_data(PARAM_CLOUD_COVER, station.id)
 
-        data_points = self._aggregate_values(raw_data.get("value", []), granularity)
+        data_points = self._aggregate_values(
+            raw_data.get("value", []), granularity, max_years=settings.smhi.max_years_history
+        )
 
         return CloudCoverResponse(
             station_name=station.name,
@@ -204,39 +212,16 @@ class SmhiService:
         # Cloud cover from meteorological observations
         cloud_station = await self._find_best_station(PARAM_CLOUD_COVER, lat, lon)
         cloud_raw = await self._client.get_station_data(PARAM_CLOUD_COVER, cloud_station.id)
-        cloud_data = self._aggregate_values(cloud_raw.get("value", []), granularity)
+        cloud_data = self._aggregate_values(
+            cloud_raw.get("value", []), granularity, max_years=settings.smhi.max_years_history
+        )
 
-        # Lightning from SMHI Lightning Archive
+        # Lightning from SMHI Lightning Archive — reuse get_lightning()
         try:
-            radius = radius_km or settings.lightning.search_radius_km
-            today = date.today()
-            start = date(today.year - settings.lightning.years_back, today.month, 1)
-
-            _logger.info(
-                f"Fetching lightning data for ({lat}, {lon}), radius={radius}km, "
-                f"date range: {start} to {today}, granularity={granularity.value}"
-            )
-
-            daily_counts = await self._lightning_client.get_strikes_in_range(
-                lat,
-                lon,
-                radius,
-                start,
-                today,
-            )
-
-            _logger.info(
-                f"Found {len(daily_counts)} days with lightning strikes (total {sum(daily_counts.values())} strikes)"
-            )
-
-            lightning_data = self._aggregate_lightning_strikes(daily_counts, granularity)
-
-            _logger.info(f"Aggregated to {len(lightning_data)} data points at {granularity.value} granularity")
-        except ValueError as e:
-            _logger.warning(f"Could not get lightning data: {e}. Returning empty.", exc_info=True)
-            lightning_data = []
+            lightning_resp = await self.get_lightning(lat, lon, granularity, radius_km)
+            lightning_data = lightning_resp.data
         except Exception as e:
-            _logger.error(f"Unexpected error fetching lightning data: {e}", exc_info=True)
+            _logger.error(f"Could not get lightning data: {e}", exc_info=True)
             lightning_data = []
 
         return CombinedWeatherResponse(

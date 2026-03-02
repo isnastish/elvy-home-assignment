@@ -1,13 +1,10 @@
 """Geocoding service using Nominatim (OpenStreetMap) — no API key needed."""
 
-import logging
-
 import httpx
 
+from src.exceptions.errors import GeocodingError
 from src.models.location import GeocodeResponse, GeocodeResult
 from src.settings import settings
-
-_logger = logging.getLogger(__name__)
 
 
 class GeocodingService:
@@ -29,10 +26,13 @@ class GeocodingService:
             "User-Agent": settings.geocoding.user_agent,
         }
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(settings.geocoding.service_url, params=params, headers=headers)
-            response.raise_for_status()
-            data = response.json()
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(settings.geocoding.service_url, params=params, headers=headers) # type: ignore
+                response.raise_for_status()
+                data = response.json()
+        except httpx.HTTPError as e:
+            raise GeocodingError(f"Failed to geocode address '{address}': {e}") from e
 
         results = []
         for item in data:
