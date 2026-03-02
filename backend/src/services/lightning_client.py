@@ -73,7 +73,7 @@ class LightningClient:
 
     async def _fetch_json(self, client: httpx.AsyncClient, url: str) -> Any | None:
         """Fetch JSON with semaphore-throttled concurrency.
-        
+
         Returns None on 404 (expected for days with no lightning data).
         """
         async with self._semaphore:
@@ -153,10 +153,7 @@ class LightningClient:
 
         # 1. Fetch available months for each year in the range
         years = range(start_date.year, end_date.year + 1)
-        year_tasks = [
-            self._fetch_json(client, f"{base}/version/latest/year/{y}.json")
-            for y in years
-        ]
+        year_tasks = [self._fetch_json(client, f"{base}/version/latest/year/{y}.json") for y in years]
         year_results = await asyncio.gather(*year_tasks, return_exceptions=True)
 
         # 2. Collect (year, month) pairs that fall within our date range
@@ -174,8 +171,7 @@ class LightningClient:
                     continue
                 # Skip months outside the requested range
                 month_start = date(year, month, 1)
-                month_end = date(
-                    year, month + 1, 1) - timedelta(days=1) if month < 12 else date(year, 12, 31)
+                month_end = date(year, month + 1, 1) - timedelta(days=1) if month < 12 else date(year, 12, 31)
                 if month_end < start_date or month_start > end_date:
                     continue
                 months_to_check.append((year, month))
@@ -184,8 +180,7 @@ class LightningClient:
 
         # 3. Fetch available days for each month
         month_tasks = [
-            self._fetch_json(client, f"{base}/version/latest/year/{y}/month/{m}.json")
-            for y, m in months_to_check
+            self._fetch_json(client, f"{base}/version/latest/year/{y}/month/{m}.json") for y, m in months_to_check
         ]
         month_results = await asyncio.gather(*month_tasks, return_exceptions=True)
 
@@ -240,10 +235,7 @@ class LightningClient:
             )
 
             # Fetch and count strikes per day — raw data is discarded inside each task
-            tasks = [
-                self._count_day_strikes(client, y, m, d, lat, lon, radius_km, bbox)
-                for y, m, d in days_to_fetch
-            ]
+            tasks = [self._count_day_strikes(client, y, m, d, lat, lon, radius_km, bbox) for y, m, d in days_to_fetch]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for (y, m, d), result in zip(days_to_fetch, results):

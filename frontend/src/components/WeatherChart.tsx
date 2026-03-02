@@ -15,6 +15,14 @@ function formatPeriod(period: string): string {
   return period;
 }
 
+/** Keep bars from becoming absurdly wide when there are few data points. */
+function categoryGap(count: number): number {
+  if (count <= 3) return 0.7;
+  if (count <= 6) return 0.5;
+  if (count <= 12) return 0.3;
+  return 0.2;
+}
+
 function computeStats(values: number[]) {
   if (values.length === 0) return null;
   return {
@@ -184,6 +192,7 @@ export function WeatherChart({ data }: WeatherChartProps) {
                 scaleType: "band",
                 data: cloudData.map((d) => formatPeriod(d.period)),
                 label: "Period",
+                categoryGapRatio: categoryGap(cloudData.length),
               },
             ]}
             series={[
@@ -192,7 +201,7 @@ export function WeatherChart({ data }: WeatherChartProps) {
                 color: "#0ea5e9",
               },
             ]}
-            yAxis={[{ label: "Cloud Cover (%)" }]}
+            yAxis={[{ label: "Cloud Cover (%)", min: 0, max: 100 }]}
             height={320}
             margin={{ top: 20, right: 30, bottom: 70, left: 70 }}
             grid={{ vertical: true, horizontal: true }}
@@ -223,6 +232,7 @@ export function WeatherChart({ data }: WeatherChartProps) {
                 scaleType: "band",
                 data: lightningData.map((d) => formatPeriod(d.period)),
                 label: "Period",
+                categoryGapRatio: categoryGap(lightningData.length),
               },
             ]}
             series={[

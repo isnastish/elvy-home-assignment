@@ -64,14 +64,27 @@ class SmhiService:
     def _aggregate_values(
         raw_values: list[dict],
         granularity: Granularity,
+        max_years: int | None = None,
     ) -> list[WeatherDataPoint]:
-        """Aggregate raw SMHI values by the given granularity."""
+        """Aggregate raw SMHI values by the given granularity.
+
+        If *max_years* is provided, only data points from the last N years
+        are included (useful for keeping the chart consistent with lightning data).
+        """
+        cutoff_ts: float | None = None
+        if max_years is not None:
+            now = datetime.now(tz=timezone.utc)
+            cutoff = now.replace(year=now.year - max_years)
+            cutoff_ts = cutoff.timestamp() * 1000  # SMHI uses ms timestamps
+
         buckets: dict[str, list[float]] = defaultdict(list)
 
         for entry in raw_values:
             ts = entry.get("date")
             val = entry.get("value")
             if ts is None or val is None:
+                continue
+            if cutoff_ts is not None and ts < cutoff_ts:
                 continue
             try:
                 value = float(val)
@@ -137,7 +150,9 @@ class SmhiService:
         station = await self._find_best_station(PARAM_CLOUD_COVER, lat, lon)
         raw_data = await self._client.get_station_data(PARAM_CLOUD_COVER, station.id)
 
-        data_points = self._aggregate_values(raw_data.get("value", []), granularity)
+        data_points = self._aggregate_values(
+            raw_data.get("value", []), granularity, max_years=settings.smhi.max_years_history
+        )
 
         return CloudCoverResponse(
             station_name=station.name,
@@ -204,7 +219,9 @@ class SmhiService:
         # Cloud cover from meteorological observations
         cloud_station = await self._find_best_station(PARAM_CLOUD_COVER, lat, lon)
         cloud_raw = await self._client.get_station_data(PARAM_CLOUD_COVER, cloud_station.id)
-        cloud_data = self._aggregate_values(cloud_raw.get("value", []), granularity)
+        cloud_data = self._aggregate_values(
+            cloud_raw.get("value", []), granularity, max_years=settings.smhi.max_years_history
+        )
 
         # Lightning from SMHI Lightning Archive
         try:

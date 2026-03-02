@@ -15,22 +15,10 @@ from src.services.smhi_service import SmhiService
 
 _logger = logging.getLogger(__name__)
 
-
-def _build_seasonal_features(n_points: int, periods_per_cycle: int = 12) -> np.ndarray:
-    """Build feature matrix with trend + seasonal components."""
-    t = np.arange(n_points, dtype=float)
-    # Features: trend, sin(seasonal), cos(seasonal), sin(2*seasonal), cos(2*seasonal)
-    angle = 2 * np.pi * t / periods_per_cycle
-    features = np.column_stack(
-        [
-            t,
-            np.sin(angle),
-            np.cos(angle),
-            np.sin(2 * angle),
-            np.cos(2 * angle),
-        ]
-    )
-    return features
+_MONTHS_PER_YEAR = 12  # Seasonal cycle length (monthly data → 12-month periodicity)
+_MIN_HISTORICAL_MONTHS = 6  # Minimum months of data needed for a meaningful forecast
+_RIDGE_ALPHA = 1.0  # Ridge regression regularization strength (higher = smoother)
+_CONFIDENCE_INTERVAL_Z_SCORE = 1.96  # Z-score for 95% confidence interval (normal distribution)
 
 
 class ForecastService:
@@ -38,6 +26,27 @@ class ForecastService:
 
     def __init__(self, smhi_service: SmhiService) -> None:
         self._smhi_service = smhi_service
+
+    @staticmethod
+    def _build_seasonal_features(
+        n_points: int, periods_per_cycle: int = _MONTHS_PER_YEAR, start: int = 0
+    ) -> np.ndarray:
+        """Build feature matrix with trend + seasonal components.
+
+        *start* lets you continue the time index from where training ended,
+        so the same function can produce both training and forecast features.
+        """
+        t = np.arange(start, start + n_points, dtype=float)
+        angle = 2 * np.pi * t / periods_per_cycle
+        return np.column_stack(
+            [
+                t,
+                np.sin(angle),
+                np.cos(angle),
+                np.sin(2 * angle),
+                np.cos(2 * angle),
+            ]
+        )
 
     async def forecast(
         self,
@@ -51,25 +60,24 @@ class ForecastService:
         Uses monthly historical data with a Ridge regression model
         capturing trend + seasonality.
         """
-        if metric == ForecastMetric.CLOUD_COVER:
-            response = await self._smhi_service.get_cloud_cover(lat, lon, Granularity.MONTH)
-            historical = response.data
-            station_name = response.station_name
-            station_id = response.station_id
-        elif metric == ForecastMetric.LIGHTNING:
-            lightning_resp = await self._smhi_service.get_lightning(lat, lon, Granularity.MONTH)
-            historical = lightning_resp.data
-            # Lightning responses don't have station_name/id — use placeholder
-            station_name = f"Area ({lat:.2f}, {lon:.2f})"
-            station_id = 0
-        else:
-            raise ValueError(f"Unknown metric: {metric}. Use 'cloud_cover' or 'lightning'.")
+        match metric:
+            case ForecastMetric.CLOUD_COVER:
+                response = await self._smhi_service.get_cloud_cover(lat, lon, Granularity.MONTH)
+                historical = response.data
+                station_name = response.station_name
+                station_id = response.station_id
+            case ForecastMetric.LIGHTNING:
+                lightning_resp = await self._smhi_service.get_lightning(lat, lon, Granularity.MONTH)
+                historical = lightning_resp.data
+                # Lightning responses don't have station_name/id — use placeholder
+                station_name = f"Area ({lat:.2f}, {lon:.2f})"
+                station_id = 0
 
-        if len(historical) < 6:
+        if len(historical) < _MIN_HISTORICAL_MONTHS:
             _logger.warning(
-                f"Not enough data for meaningful forecast: {len(historical)} months. Returning empty forecast."
+                f"Not enough data for meaningful forecast: {len(historical)} months "
+                f"(need ≥{_MIN_HISTORICAL_MONTHS}). Returning empty forecast."
             )
-            # Not enough data for meaningful forecast — return empty
             return ForecastResponse(
                 station_name=station_name,
                 station_id=station_id,
@@ -82,8 +90,8 @@ class ForecastService:
         values = np.array([p.value for p in historical])
         n = len(values)
 
-        X_train = _build_seasonal_features(n, periods_per_cycle=12)
-        model = Ridge(alpha=1.0)
+        X_train = self._build_seasonal_features(n)
+        model = Ridge(alpha=_RIDGE_ALPHA)
         model.fit(X_train, values)
 
         # Predict on training data to get residual std
@@ -92,17 +100,7 @@ class ForecastService:
         residual_std = float(np.std(residuals))
 
         # Forecast future
-        future_indices = np.arange(n, n + months_ahead, dtype=float)
-        angle = 2 * np.pi * future_indices / 12
-        X_future = np.column_stack(
-            [
-                future_indices,
-                np.sin(angle),
-                np.cos(angle),
-                np.sin(2 * angle),
-                np.cos(2 * angle),
-            ]
-        )
+        X_future = self._build_seasonal_features(months_ahead, start=n)
         future_pred = model.predict(X_future)
 
         # Generate period labels for forecast
@@ -118,8 +116,8 @@ class ForecastService:
             period_label = f"{year:04d}-{month:02d}"
 
             predicted = float(future_pred[i])
-            lower = round(max(predicted - 1.96 * residual_std, 0), 2)
-            upper = round(predicted + 1.96 * residual_std, 2)
+            lower = round(max(predicted - _CONFIDENCE_INTERVAL_Z_SCORE * residual_std, 0), 2)
+            upper = round(predicted + _CONFIDENCE_INTERVAL_Z_SCORE * residual_std, 2)
 
             forecast_points.append(
                 ForecastDataPoint(
