@@ -1,28 +1,20 @@
 """Raw SMHI Open Data API client with in-memory caching."""
 
 import logging
-import math
 from datetime import datetime, timedelta
 from typing import Any
 
 import httpx
 
+from src.exceptions.errors import SmhiApiError
 from src.models.location import Station
+from src.services.geo_utils import haversine_km
 from src.settings import settings
 
 _logger = logging.getLogger(__name__)
 
 # SMHI Metobs parameter IDs - loaded from settings
 PARAM_CLOUD_COVER = settings.smhi.parameters.cloud_cover  # Total cloud cover (mean, percent 0–100)
-
-
-def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Calculate distance in km between two lat/lon points."""
-    R = 6371.0
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
-    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
 class SmhiClient:
@@ -52,10 +44,13 @@ class SmhiClient:
         url = f"{settings.smhi.base_url}/version/latest/parameter/{parameter}.json"
         _logger.info(f"Fetching stations for parameter {parameter} from {url}")
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            data = response.json()
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                data = response.json()
+        except httpx.HTTPError as e:
+            raise SmhiApiError(f"Failed to fetch stations for parameter {parameter}: {e}") from e
 
         stations: list[Station] = []
         for s in data.get("station", []):
@@ -79,7 +74,7 @@ class SmhiClient:
 
         stations_with_distance = []
         for s in all_stations:
-            dist = _haversine_km(lat, lon, s.latitude, s.longitude)
+            dist = haversine_km(lat, lon, s.latitude, s.longitude)
             stations_with_distance.append(
                 Station(
                     id=s.id,
@@ -127,7 +122,7 @@ class SmhiClient:
                     values = data.get("value", [])
                     all_values.extend(values)
                 except httpx.HTTPError as e:
-                    _logger.warning(f"Failed to fetch {period} data: {e}")
+                    _logger.warning(f"Failed to fetch {period} data for station {station_id}: {e}")
                     continue
 
         # Deduplicate by timestamp (prefer later entries)

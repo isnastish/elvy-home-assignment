@@ -22,18 +22,10 @@ from typing import Any
 
 import httpx
 
+from src.services.geo_utils import haversine_km
 from src.settings import settings
 
 _logger = logging.getLogger(__name__)
-
-
-def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Haversine distance in km between two (lat, lon) points."""
-    R = 6371.0
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
-    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
 def _bounding_box(lat: float, lon: float, radius_km: float) -> tuple[float, float, float, float]:
@@ -131,7 +123,7 @@ class LightningClient:
                 continue
             if not (min_lat <= s_lat <= max_lat and min_lon <= s_lon <= max_lon):
                 continue
-            if _haversine_km(lat, lon, s_lat, s_lon) <= radius_km:
+            if haversine_km(lat, lon, s_lat, s_lon) <= radius_km:
                 count += 1
 
         self._set_cached(cache_key, count)

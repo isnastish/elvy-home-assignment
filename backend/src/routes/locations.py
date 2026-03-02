@@ -49,12 +49,6 @@ async def get_nearest_stations(
     """Find SMHI weather stations nearest to the given coordinates."""
     _logger.info(f"Finding stations near ({lat}, {lon})")
     stations = await smhi_service.find_nearest_stations(lat, lon, limit)
-
-    # Select the nearest active station
-    selected = stations[0]
-    for s in stations:
-        if s.active:
-            selected = s
-            break
+    selected = await smhi_service.find_best_station(lat, lon)
 
     return StationsResponse(stations=stations, selected_station=selected)
