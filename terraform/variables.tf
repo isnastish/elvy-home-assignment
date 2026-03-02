@@ -24,9 +24,3 @@ variable "backend_env_vars" {
   type        = map(string)
   default     = {}
 }
-
-variable "cors_origins" {
-  description = "CORS origins for the backend service. If not set, will use the frontend service URL."
-  type        = list(string)
-  default     = []
-}

@@ -33,9 +33,9 @@ resource "google_cloud_run_v2_service" "backend" {
   name     = "smhi-weather-backend"
   location = var.region
 
-  depends_on = [google_cloud_run_v2_service.frontend]
-
   template {
+    timeout = "600s"
+
     containers {
       image = var.backend_image
 
@@ -46,11 +46,6 @@ resource "google_cloud_run_v2_service" "backend" {
       env {
         name  = "SMHI_CACHE_TTL_HOURS"
         value = "6"
-      }
-
-      env {
-        name  = "CORS__ORIGINS"
-        value = jsonencode(length(var.cors_origins) > 0 ? var.cors_origins : [google_cloud_run_v2_service.frontend.uri])
       }
 
       dynamic "env" {
