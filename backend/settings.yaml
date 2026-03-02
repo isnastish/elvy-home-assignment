@@ -1,12 +1,13 @@
 # SMHI Weather Analytics API Configuration
 
 # CORS Configuration
-# Note: For production deployment, CORS_ORIGINS is set via environment variables
-# to use the actual Cloud Run frontend URL. These defaults are for local development.
+# Local development + production origins.
+# Having localhost origins in production is harmless (no real browser sends them).
 cors:
   origins:
     - "http://localhost:3000"
     - "http://localhost:5173"
+    - "https://smhi-weather-frontend-336460749286.europe-north1.run.app"
 
 # SMHI API Configuration
 smhi:
