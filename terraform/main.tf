@@ -43,19 +43,6 @@ resource "google_cloud_run_v2_service" "backend" {
         container_port = 8080
       }
 
-      env {
-        name  = "SMHI_CACHE_TTL_HOURS"
-        value = "6"
-      }
-
-      dynamic "env" {
-        for_each = var.backend_env_vars
-        content {
-          name  = env.key
-          value = env.value
-        }
-      }
-
       resources {
         limits = {
           cpu    = "1"
@@ -65,7 +52,7 @@ resource "google_cloud_run_v2_service" "backend" {
     }
 
     scaling {
-      min_instance_count = 0
+      min_instance_count = 1
       max_instance_count = 3
     }
   }

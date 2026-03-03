@@ -18,9 +18,3 @@ variable "frontend_image" {
   description = "Docker image for the frontend service"
   type        = string
 }
-
-variable "backend_env_vars" {
-  description = "Environment variables for the backend service"
-  type        = map(string)
-  default     = {}
-}

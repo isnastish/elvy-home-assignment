@@ -41,7 +41,7 @@ jobs:
           service: smhi-weather-backend
           region: ${{ env.REGION }}
           image: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/smhi-weather-app/backend:${{ github.sha }}
-          flags: '--allow-unauthenticated --memory=1Gi --timeout=600'
+          flags: '--allow-unauthenticated --memory=1Gi --timeout=600 --min-instances=1 --max-instances=3'
 
   deploy-frontend:
     name: Deploy Frontend

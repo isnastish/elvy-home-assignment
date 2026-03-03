@@ -1,137 +1,63 @@
 # SMHI Weather Analytics
 
-A full-stack web application for visualizing historical cloud cover and lightning strike data for Swedish locations, powered by [SMHI Open Data](https://opendata.smhi.se).
-
-## Features
-
-- **Address search** — enter any Swedish address or city, geocoded via OpenStreetMap/Nominatim
-- **Cloud cover visualization** — historical cloud cover data (percentage, 0–100%) from the nearest SMHI station
-- **Lightning strikes** — actual lightning strike counts from the SMHI Lightning Archive API, filtered by proximity to the selected location
-- **Granularity toggle** — view data aggregated by day, month, or year
-- **AI forecasting** — Ridge regression model with seasonal decomposition predicts future values with 95% confidence intervals
-- **Terraform deployment** — infrastructure-as-code for Google Cloud Run
-- **CI/CD** — GitHub Actions pipelines for testing, linting, and deployment
+Full-stack app for visualizing historical cloud cover and lightning strike data for Swedish locations, powered by [SMHI Open Data](https://opendata.smhi.se).
 
 ## Tech Stack
 
 | Layer | Technologies |
 |---|---|
-| Frontend | React, TypeScript, Vite, Material-UI (MUI), MUI X Charts, Tailwind CSS, Axios |
-| Backend | Python 3.12, FastAPI, httpx, Pydantic, scikit-learn, uv |
-| Infra | Docker, Docker Compose, Terraform (GCP Cloud Run) |
-| CI/CD | GitHub Actions |
-
-## Prerequisites
-
-- **Python 3.12+** and [uv](https://docs.astral.sh/uv/) (for the backend)
-- **Node.js 20+** and npm (for the frontend)
-- **Docker & Docker Compose** (optional, for containerized setup)
+| Frontend | React, TypeScript, Vite, MUI X Charts |
+| Backend | Python 3.12, FastAPI, httpx, scikit-learn, uv |
+| Infra | Docker Compose, Terraform, GCP Cloud Run, GitHub Actions |
 
 ## Quick Start
 
-### Option 1: Docker Compose (recommended)
+### Docker Compose
 
 ```bash
 docker compose up --build
 ```
 
-This starts both services:
 - Frontend → http://localhost:3000
-- Backend → http://localhost:8000
-- API docs → http://localhost:8000/docs
+- Backend API docs → http://localhost:8000/docs
 
-### Option 2: Run locally (for development)
-
-**Backend:**
+### Local Development
 
 ```bash
+# Backend
 cd backend
-uv sync                                    # install dependencies
-uv run fastapi dev src/main.py --port 8000 # start dev server with hot-reload
-```
+uv sync
+uv run fastapi dev src/main.py --port 8000
 
-**Frontend** (in a separate terminal):
-
-```bash
+# Frontend (separate terminal)
 cd frontend
-npm install    # install dependencies
-npm run dev    # start Vite dev server
+npm install
+npm run dev
 ```
 
-- Frontend → http://localhost:5173
-- Backend → http://localhost:8000
-- API docs → http://localhost:8000/docs
-
-## API Endpoints
-
-All endpoints are prefixed with `/api/v1`.
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/health` | Health check |
-| `GET` | `/api/v1/locations/geocode?address=...` | Geocode an address to lat/lon |
-| `GET` | `/api/v1/locations/stations?lat=...&lon=...` | Find nearest SMHI stations |
-| `GET` | `/api/v1/weather/cloud-cover?lat=...&lon=...&granularity=month` | Cloud cover data |
-| `GET` | `/api/v1/weather/lightning?lat=...&lon=...&granularity=month&radius_km=50` | Lightning strike counts |
-| `GET` | `/api/v1/weather/combined?lat=...&lon=...&granularity=month&radius_km=50` | Both cloud cover and lightning |
-| `GET` | `/api/v1/forecast?lat=...&lon=...&metric=cloud_cover&months_ahead=12` | AI forecast |
-
-Granularity options: `day`, `month`, `year`.
-
-## Running Tests
+## Tests & Linting
 
 ```bash
 cd backend
-uv run pytest -v                         # run all tests
-uv run pytest --cov=src --cov-report=term # with coverage report
-```
-
-## Linting
-
-```bash
-cd backend
-uv run ruff check .   # lint
-uv run ruff format .  # auto-format
+uv run pytest -v
+uv run ruff check .
 ```
 
 ## Configuration
 
-The backend is configured via environment variables (with sensible defaults):
+Backend settings live in `backend/settings.yaml` and can be overridden via environment variables (`__` as nesting delimiter, e.g. `SMHI__CACHE_TTL_HOURS=12`).
 
-| Variable | Default | Description |
-|---|---|---|
-| `CORS_ORIGINS` | `["http://localhost:3000", "http://localhost:5173"]` | Allowed CORS origins |
-| `SMHI_CACHE_TTL_HOURS` | `6` | How long to cache SMHI API responses |
-| `LIGHTNING_SEARCH_RADIUS_KM` | `50` | Radius (km) for lightning strike proximity search |
-
-The frontend uses a build-time variable:
-
-| Variable | Default | Description |
-|---|---|---|
-| `VITE_API_URL` | `http://localhost:8000/api/v1` | Backend API base URL |
+The frontend uses a build-time variable `VITE_API_URL` (defaults to `http://localhost:8000/api/v1`).
 
 ## Deployment
 
-### CI/CD (GitHub Actions)
+Pushing to `main` triggers GitHub Actions CI/CD → builds Docker images → deploys to Cloud Run.
 
-The application is automatically deployed to Google Cloud Run via GitHub Actions when code is pushed to the `main` branch.
+**Required GitHub config:**
+- **Variable:** `GCP_PROJECT_ID`
+- **Secrets:** `WIF_PROVIDER`, `WIF_SERVICE_ACCOUNT`
 
-**Workflow:**
-- **CI** (`ci.yml`) — runs on every push/PR to `main`: lints, tests, type-checks, and builds
-- **CD** (`cd.yml`) — runs on push to `main`: builds Docker images, pushes to Artifact Registry, deploys to Cloud Run
-
-**Required GitHub Configuration:**
-
-1. **Repository Variables:**
-   - `GCP_PROJECT_ID` — Your GCP project ID
-
-2. **Repository Secrets:**
-   - `WIF_PROVIDER` — Workload Identity Federation provider (full resource name)
-   - `WIF_SERVICE_ACCOUNT` — GCP service account email (e.g., `github-actions@PROJECT_ID.iam.gserviceaccount.com`)
-
-**Initial Infrastructure Setup:**
-
-The first deployment requires infrastructure to be created. You can use Terraform:
+**Initial infra setup:**
 
 ```bash
 cd terraform
@@ -140,12 +66,3 @@ terraform apply -var="project_id=YOUR_PROJECT_ID" \
                -var="backend_image=PLACEHOLDER" \
                -var="frontend_image=PLACEHOLDER"
 ```
-
-After initial setup, GitHub Actions will handle all subsequent deployments automatically.
-
-
-## Data Sources
-
-- **Cloud cover**: [SMHI Metobs API](https://opendata.smhi.se/apidocs/metobs/) — Parameter 16: Total cloud cover (percent, 0–100%)
-- **Lightning strikes**: [SMHI Lightning Archive API](https://opendata-download-lightning.smhi.se/api/) — individual strike records with lat/lon, filtered by proximity
-- **Geocoding**: [Nominatim (OpenStreetMap)](https://nominatim.openstreetmap.org/)
