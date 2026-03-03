@@ -13,7 +13,7 @@ const API_BASE =
 
 const api = axios.create({
   baseURL: API_BASE,
-  timeout: 30000,
+  timeout: 120_000, // 2 min — lightning data discovery can be slow on first load
 });
 
 export async function geocodeAddress(
