@@ -28,7 +28,7 @@ class GeocodingService:
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(settings.geocoding.service_url, params=params, headers=headers) # type: ignore
+                response = await client.get(settings.geocoding.service_url, params=params, headers=headers)  # type: ignore
                 response.raise_for_status()
                 data = response.json()
         except httpx.HTTPError as e:

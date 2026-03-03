@@ -18,7 +18,6 @@ _logger = logging.getLogger(__name__)
 _MONTHS_PER_YEAR = 12  # Seasonal cycle length (monthly data → 12-month periodicity)
 _MIN_HISTORICAL_MONTHS = 6  # Minimum months of data needed for a meaningful forecast
 _RIDGE_ALPHA = 1.0  # Ridge regression regularization strength (higher = smoother)
-_CONFIDENCE_INTERVAL_Z_SCORE = 1.96  # Z-score for 95% confidence interval (normal distribution)
 
 
 class ForecastService:
@@ -94,17 +93,11 @@ class ForecastService:
         model = Ridge(alpha=_RIDGE_ALPHA)
         model.fit(X_train, values)
 
-        # Predict on training data to get residual std
-        train_pred = model.predict(X_train)
-        residuals = values - train_pred
-        residual_std = float(np.std(residuals))
-
         # Forecast future
         X_future = self._build_seasonal_features(months_ahead, start=n)
         future_pred = model.predict(X_future)
 
-        # Generate period labels for forecast
-        # Parse last historical period to continue
+        # Generate period labels continuing from the last historical period
         last_period = historical[-1].period  # e.g. "2025-06"
         last_year, last_month = map(int, last_period.split("-"))
 
@@ -113,18 +106,11 @@ class ForecastService:
             month = last_month + 1 + i
             year = last_year + (month - 1) // 12
             month = ((month - 1) % 12) + 1
-            period_label = f"{year:04d}-{month:02d}"
-
-            predicted = float(future_pred[i])
-            lower = round(max(predicted - _CONFIDENCE_INTERVAL_Z_SCORE * residual_std, 0), 2)
-            upper = round(predicted + _CONFIDENCE_INTERVAL_Z_SCORE * residual_std, 2)
 
             forecast_points.append(
                 ForecastDataPoint(
-                    period=period_label,
-                    predicted_value=round(predicted, 2),
-                    lower_bound=lower,
-                    upper_bound=upper,
+                    period=f"{year:04d}-{month:02d}",
+                    predicted_value=round(float(future_pred[i]), 2),
                 )
             )
 

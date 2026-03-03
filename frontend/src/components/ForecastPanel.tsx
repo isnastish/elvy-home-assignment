@@ -33,16 +33,8 @@ export function ForecastPanel({ forecastData, loading, onFetchForecast }: Foreca
       ...Array(recent.length).fill(null),
       ...forecastData.forecast.map((p) => p.predicted_value),
     ];
-    const lowerBounds = [
-      ...Array(recent.length).fill(null),
-      ...forecastData.forecast.map((p) => p.lower_bound),
-    ];
-    const upperBounds = [
-      ...Array(recent.length).fill(null),
-      ...forecastData.forecast.map((p) => p.upper_bound),
-    ];
 
-    return { allPeriods, historicalValues, predictedValues, lowerBounds, upperBounds };
+    return { allPeriods, historicalValues, predictedValues };
   }, [forecastData]);
 
   return (
@@ -214,20 +206,6 @@ export function ForecastPanel({ forecastData, loading, onFetchForecast }: Foreca
                   color: "#7c3aed",
                   curve: "linear",
                   showMark: true,
-                },
-                {
-                  data: chartData.lowerBounds,
-                  label: "Lower Bound (95% CI)",
-                  color: "#a78bfa",
-                  curve: "linear",
-                  showMark: false,
-                },
-                {
-                  data: chartData.upperBounds,
-                  label: "Upper Bound (95% CI)",
-                  color: "#a78bfa",
-                  curve: "linear",
-                  showMark: false,
                 },
               ]}
               yAxis={[{ label: metricLabel(forecastData.metric) }]}

@@ -63,8 +63,6 @@ class ForecastDataPoint(BaseModel):
 
     period: str
     predicted_value: float
-    lower_bound: float
-    upper_bound: float
 
 
 class ForecastResponse(BaseModel):

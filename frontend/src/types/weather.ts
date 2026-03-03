@@ -61,8 +61,6 @@ export interface StationsResponse {
 export interface ForecastDataPoint {
   period: string;
   predicted_value: number;
-  lower_bound: number;
-  upper_bound: number;
 }
 
 export type ForecastMetric = "cloud_cover" | "lightning";
