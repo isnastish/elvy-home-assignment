@@ -83,4 +83,4 @@ jobs:
           service: smhi-weather-frontend
           region: ${{ env.REGION }}
           image: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/smhi-weather-app/frontend:${{ github.sha }}
-          flags: '--allow-unauthenticated'
+          flags: '--allow-unauthenticated --min-instances=1'
